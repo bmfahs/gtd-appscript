@@ -1,0 +1,39 @@
+{
+    "timeZone": "America/Chicago",
+    "dependencies": {},
+    "exceptionLogging": "STACKDRIVER",
+    "runtimeVersion": "V8",
+    "webapp": {
+        "executeAs": "USER_DEPLOYING",
+        "access": "MYSELF"
+    },
+    "oauthScopes": [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/gmail.addons.execute",
+        "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
+        "https://www.googleapis.com/auth/gmail.modify",
+        "https://www.googleapis.com/auth/gmail.labels"
+    ],
+    "urlFetchWhitelist": [],
+    "addOns": {
+        "common": {
+            "name": "GTD System",
+            "logoUrl": "https://www.gstatic.com/images/branding/product/2x/tasks_48dp.png",
+            "useLocaleFromApp": true,
+            "homepageTrigger": {
+                "runFunction": "buildAddOnHomepage"
+            }
+        },
+        "gmail": {
+            "contextualTriggers": [
+                {
+                    "unconditional": {},
+                    "onTriggerFunction": "buildAddOnContextualCard"
+                }
+            ],
+            "homepageTrigger": {
+                "runFunction": "onGmailHomePageOpen"
+            }
+        }
+    }
+}

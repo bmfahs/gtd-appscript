@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --secondary: #64748b;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-muted: #94a3b8;
+            --border-color: #e2e8f0;
+            --border-radius: 8px;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+            --sidebar-width: 240px;
+            --header-height: 60px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 16px;
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: var(--border-radius);
+        }
+
+        .menu-toggle:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .quick-capture {
+            flex: 1;
+            max-width: 500px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .quick-capture input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 14px;
+        }
+
+        .quick-capture input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .header-right {
+            display: flex;
+            gap: 12px;
+        }
+
+        .header-right select {
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 13px;
+            background: var(--bg-primary);
+        }
+
+        .main-container {
+            display: flex;
+            margin-top: var(--header-height);
+            min-height: calc(100vh - var(--header-height));
+        }
+
+        .sidebar {
+            position: fixed;
+            top: var(--header-height);
+            left: 0;
+            width: var(--sidebar-width);
+            height: calc(100vh - var(--header-height));
+            background: var(--bg-primary);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 16px 0;
+            z-index: 90;
+        }
+
+        .nav-section {
+            margin-bottom: 24px;
+        }
+
+        .nav-section-title {
+            padding: 0 16px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: rgba(37, 99, 235, 0.1);
+            color: var(--primary);
+        }
+
+        .nav-item .material-icons {
+            font-size: 20px;
+        }
+
+        .badge {
+            margin-left: auto;
+            background: var(--danger);
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        .badge:empty {
+            display: none;
+        }
+
+        .content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            padding: 24px;
+            max-width: 1000px;
+        }
+
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--text-muted);
+        }
+
+        .spinning {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .page-header {
+            margin-bottom: 24px;
+        }
+
+        .page-header h2 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .page-header p {
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .task-list {
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .task-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .task-item:last-child {
+            border-bottom: none;
+        }
+
+        .task-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .task-checkbox {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .task-checkbox:hover {
+            border-color: var(--primary);
+        }
+
+        .task-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .task-title {
+            font-weight: 500;
+            color: var(--text-primary);
+            word-break: break-word;
+        }
+
+        .task-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 4px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .context-group {
+            margin-bottom: 24px;
+        }
+
+        .context-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 0;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .context-icon {
+            font-size: 18px;
+        }
+
+        .project-card {
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .project-card:hover {
+            box-shadow: var(--shadow);
+            border-color: var(--primary);
+        }
+
+        .project-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .project-name {
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--text-primary);
+        }
+
+        .project-stats {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .project-description {
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--text-muted);
+        }
+
+        .empty-state .material-icons {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-icon {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: var(--border-radius);
+            color: var(--text-secondary);
+        }
+
+        .btn-icon:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            padding: 24px;
+        }
+
+        .dialog {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 560px;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .dialog-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .dialog-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .dialog-content {
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .dialog-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+
+        .dialog-footer-right {
+            display: flex;
+            gap: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: var(--text-primary);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        textarea.form-control {
+            resize: vertical;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .email-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--primary);
+            text-decoration: none;
+            padding: 8px 12px;
+            background: rgba(37, 99, 235, 0.1);
+            border-radius: var(--border-radius);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--text-primary);
+            color: white;
+            padding: 12px 24px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-lg);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 300;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .review-section {
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .review-section h3 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .review-section h3 .material-icons {
+            color: var(--primary);
+        }
+
+        .add-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: var(--bg-primary);
+            border: 2px dashed var(--border-color);
+            border-radius: var(--border-radius);
+            color: var(--text-muted);
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.15s;
+            margin-top: 8px;
+        }
+
+        .add-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        @media (max-width: 768px) {
+            .menu-toggle {
+                display: block;
+            }
+
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .content {
+                margin-left: 0;
+            }
+
+            .header-right {
+                display: none;
+            }
+
+            .quick-capture {
+                flex: 1;
+                max-width: none;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .dialog {
+                max-width: none;
+                margin: 0;
+                border-radius: 0;
+                max-height: 100vh;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <header class="header">
+            <div class="header-left">
+                <button class="menu-toggle" onclick="toggleSidebar()">
+                    <span class="material-icons">menu</span>
+                </button>
+                <h1 class="logo">GTD</h1>
+            </div>
+            <div class="quick-capture">
+                <input type="text" id="quickCaptureInput" placeholder="Quick capture... (press Enter)"
+                    onkeypress="handleQuickCapture(event)">
+                <button onclick="submitQuickCapture()" class="btn-icon">
+                    <span class="material-icons">add</span>
+                </button>
+            </div>
+            <div class="header-right">
+                <select id="currentContext" onchange="updateCurrentContext()">
+                    <option value="">All Contexts</option>
+                </select>
+                <select id="currentEnergy" onchange="updateCurrentEnergy()">
+                    <option value="high">High Energy</option>
+                    <option value="medium" selected>Medium Energy</option>
+                    <option value="low">Low Energy</option>
+                </select>
+            </div>
+        </header>
+        <div class="main-container">
+            <nav class="sidebar" id="sidebar">
+                <div class="nav-section">
+                    <div class="nav-section-title">Collect</div>
+                    <a href="#" class="nav-item" data-page="inbox" onclick="navigateTo('inbox'); return false;">
+                        <span class="material-icons">inbox</span><span>Inbox</span><span class="badge"
+                            id="inboxBadge"></span>
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Do</div>
+                    <a href="#" class="nav-item" data-page="next" onclick="navigateTo('next'); return false;">
+                        <span class="material-icons">play_arrow</span><span>Next Actions</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="today" onclick="navigateTo('today'); return false;">
+                        <span class="material-icons">today</span><span>Today</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="scheduled" onclick="navigateTo('scheduled'); return false;">
+                        <span class="material-icons">event</span><span>Scheduled</span>
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Track</div>
+                    <a href="#" class="nav-item" data-page="waiting" onclick="navigateTo('waiting'); return false;">
+                        <span class="material-icons">hourglass_empty</span><span>Waiting For</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="projects" onclick="navigateTo('projects'); return false;">
+                        <span class="material-icons">folder</span><span>Projects</span>
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Review</div>
+                    <a href="#" class="nav-item" data-page="someday" onclick="navigateTo('someday'); return false;">
+                        <span class="material-icons">cloud</span><span>Someday/Maybe</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="review" onclick="navigateTo('review'); return false;">
+                        <span class="material-icons">rate_review</span><span>Weekly Review</span>
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Organize</div>
+                    <a href="#" class="nav-item" data-page="contexts" onclick="navigateTo('contexts'); return false;">
+                        <span class="material-icons">label</span><span>Contexts</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="areas" onclick="navigateTo('areas'); return false;">
+                        <span class="material-icons">category</span><span>Areas</span>
+                    </a>
+                </div>
+            </nav>
+            <main class="content" id="content">
+                <div class="loading" id="loading">
+                    <span class="material-icons spinning">refresh</span>
+                    <p>Loading...</p>
+                </div>
+                <div id="pageContent"></div>
+            </main>
+        </div>
+        <div class="dialog-overlay" id="taskDialog" style="display: none;">
+            <div class="dialog">
+                <div class="dialog-header">
+                    <h2 id="dialogTitle">Edit Task</h2>
+                    <button class="btn-icon" onclick="closeTaskDialog()"><span
+                            class="material-icons">close</span></button>
+                </div>
+                <div class="dialog-content">
+                    <div class="form-group"><label for="taskTitle">Title</label><input type="text" id="taskTitle"
+                            class="form-control"></div>
+                    <div class="form-group"><label for="taskNotes">Notes</label><textarea id="taskNotes"
+                            class="form-control" rows="4"></textarea></div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="taskStatus">Status</label>
+                            <select id="taskStatus" class="form-control">
+                                <option value="inbox">Inbox</option>
+                                <option value="next">Next Action</option>
+                                <option value="waiting">Waiting For</option>
+                                <option value="scheduled">Scheduled</option>
+                                <option value="someday">Someday/Maybe</option>
+                                <option value="reference">Reference</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label for="taskProject">Project</label><select id="taskProject"
+                                class="form-control">
+                                <option value="">No Project</option>
+                            </select></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="taskContext">Context</label><select id="taskContext"
+                                class="form-control">
+                                <option value="">No Context</option>
+                            </select></div>
+                        <div class="form-group"><label for="taskEnergy">Energy Required</label>
+                            <select id="taskEnergy" class="form-control">
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="taskDueDate">Due Date</label><input type="date"
+                                id="taskDueDate" class="form-control"></div>
+                        <div class="form-group"><label for="taskScheduledDate">Scheduled Date</label><input type="date"
+                                id="taskScheduledDate" class="form-control"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="taskTimeEstimate">Time Estimate (min)</label><input
+                                type="number" id="taskTimeEstimate" class="form-control" min="0" step="5"></div>
+                        <div class="form-group"><label for="taskWaitingFor">Waiting For</label><input type="text"
+                                id="taskWaitingFor" class="form-control"></div>
+                    </div>
+                    <div id="emailLink" class="form-group" style="display: none;">
+                        <label>Linked Email</label><a href="#" id="emailLinkAnchor" target="_blank"
+                            class="email-link"><span class="material-icons">email</span><span>Open in Gmail</span></a>
+                    </div>
+                </div>
+                <div class="dialog-footer">
+                    <button class="btn btn-danger" id="deleteTaskBtn" onclick="deleteCurrentTask()"><span
+                            class="material-icons">delete</span>Delete</button>
+                    <div class="dialog-footer-right">
+                        <button class="btn btn-secondary" onclick="closeTaskDialog()">Cancel</button>
+                        <button class="btn btn-primary" onclick="saveTask()">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="dialog-overlay" id="projectDialog" style="display: none;">
+            <div class="dialog">
+                <div class="dialog-header">
+                    <h2 id="projectDialogTitle">Edit Project</h2>
+                    <button class="btn-icon" onclick="closeProjectDialog()"><span
+                            class="material-icons">close</span></button>
+                </div>
+                <div class="dialog-content">
+                    <div class="form-group"><label for="projectName">Name</label><input type="text" id="projectName"
+                            class="form-control"></div>
+                    <div class="form-group"><label for="projectDescription">Description</label><textarea
+                            id="projectDescription" class="form-control" rows="3"></textarea></div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="projectStatus">Status</label>
+                            <select id="projectStatus" class="form-control">
+                                <option value="active">Active</option>
+                                <option value="someday">Someday</option>
+                                <option value="completed">Completed</option>
+                                <option value="dropped">Dropped</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label for="projectArea">Area</label><select id="projectArea"
+                                class="form-control">
+                                <option value="">No Area</option>
+                            </select></div>
+                    </div>
+                    <div class="form-group"><label for="projectDueDate">Due Date</label><input type="date"
+                            id="projectDueDate" class="form-control"></div>
+                </div>
+                <div class="dialog-footer">
+                    <button class="btn btn-danger" id="deleteProjectBtn" onclick="deleteCurrentProject()"><span
+                            class="material-icons">delete</span>Delete</button>
+                    <div class="dialog-footer-right">
+                        <button class="btn btn-secondary" onclick="closeProjectDialog()">Cancel</button>
+                        <button class="btn btn-primary" onclick="saveProject()">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="toast" class="toast"></div>
+    </div>
+    <script>
+        var state = { tasks: [], projects: [], contexts: [], areas: [], settings: {}, currentPage: 'inbox', currentTask: null, currentProject: null };
+        function init(p) { state.currentPage = p || 'inbox'; loadAllData(); }
+        function loadAllData() { showLoading(true); google.script.run.withSuccessHandler(onDataLoaded).withFailureHandler(onDataError).getAllData(); }
+        function onDataLoaded(d) { if (!d) { showToast('No data'); showLoading(false); return; } state.tasks = d.tasks || []; state.projects = d.projects || []; state.contexts = d.contexts || []; state.areas = d.areas || []; state.settings = d.settings || {}; populateSelects(); updateInboxBadge(); navigateTo(state.currentPage); showLoading(false); }
+        function onDataError(e) { showToast('Error: ' + e); showLoading(false); }
+        function populateSelects() { var cc = document.getElementById('currentContext'); if (cc) { cc.innerHTML = '<option value="">All Contexts</option>'; state.contexts.forEach(function (c) { cc.innerHTML += '<option value="' + c.id + '">' + c.icon + ' ' + c.name + '</option>'; }); } var ce = document.getElementById('currentEnergy'); if (ce) ce.value = state.settings.currentEnergyLevel || 'medium'; var tp = document.getElementById('taskProject'); if (tp) { tp.innerHTML = '<option value="">No Project</option>'; state.projects.forEach(function (p) { if (p.status === 'active') tp.innerHTML += '<option value="' + p.id + '">' + esc(p.name) + '</option>'; }); } var tc = document.getElementById('taskContext'); if (tc) { tc.innerHTML = '<option value="">No Context</option>'; state.contexts.forEach(function (c) { tc.innerHTML += '<option value="' + c.id + '">' + c.icon + ' ' + c.name + '</option>'; }); } var pa = document.getElementById('projectArea'); if (pa) { pa.innerHTML = '<option value="">No Area</option>'; state.areas.forEach(function (a) { pa.innerHTML += '<option value="' + a.id + '">' + a.icon + ' ' + a.name + '</option>'; }); } }
+        function navigateTo(p) { state.currentPage = p; document.querySelectorAll('.nav-item').forEach(function (i) { i.classList.remove('active'); if (i.dataset.page === p) i.classList.add('active'); }); var sb = document.getElementById('sidebar'); if (sb) sb.classList.remove('open'); renderPage(p); }
+        function toggleSidebar() { var sb = document.getElementById('sidebar'); if (sb) sb.classList.toggle('open'); }
+        function renderPage(p) { var c = document.getElementById('pageContent'); if (!c) return; var h = ''; if (p === 'inbox') h = renderInbox(); else if (p === 'next') h = renderNext(); else if (p === 'today') h = renderToday(); else if (p === 'scheduled') h = renderScheduled(); else if (p === 'waiting') h = renderWaiting(); else if (p === 'projects') h = renderProjects(); else if (p === 'someday') h = renderSomeday(); else if (p === 'review') h = renderReview(); else if (p === 'contexts') h = renderContexts(); else if (p === 'areas') h = renderAreas(); else h = renderInbox(); c.innerHTML = h; }
+        function renderInbox() { var t = state.tasks.filter(function (x) { return x.status === 'inbox'; }); var h = '<div class="page-header"><h2>Inbox</h2><p>Capture everything, process later</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">inbox</span><h3>Inbox Zero!</h3><p>Everything processed.</p></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
+        function renderNext() { var t = state.tasks.filter(function (x) { return x.status === 'next'; }); var h = '<div class="page-header"><h2>Next Actions</h2><p>Things ready to do now</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">check_circle</span><h3>No Next Actions</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
+        function renderToday() { var td = new Date().toISOString().split('T')[0]; var t = state.tasks.filter(function (x) { return (x.dueDate === td || x.scheduledDate === td) && x.status !== 'done' && x.status !== 'deleted'; }); var h = '<div class="page-header"><h2>Today</h2><p>' + new Date().toLocaleDateString() + '</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">event_available</span><h3>Clear Day</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
+        function renderScheduled() { var t = state.tasks.filter(function (x) { return x.status === 'scheduled'; }); var h = '<div class="page-header"><h2>Scheduled</h2><p>Tasks for specific dates</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">event</span><h3>Nothing Scheduled</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
+        function renderWaiting() { var t = state.tasks.filter(function (x) { return x.status === 'waiting'; }); var h = '<div class="page-header"><h2>Waiting For</h2><p>Delegated items</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">hourglass_empty</span><h3>Not Waiting</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
+        function renderProjects() { var p = state.projects.filter(function (x) { return x.status === 'active'; }); var h = '<div class="page-header"><h2>Projects</h2><p>Multi-step outcomes</p></div>'; h += '<button class="btn btn-primary" onclick="openProjectDialog()" style="margin-bottom:16px"><span class="material-icons">add</span> New Project</button>'; if (p.length === 0) h += '<div class="empty-state"><span class="material-icons">folder_open</span><h3>No Active Projects</h3></div>'; else p.forEach(function (x) { var tc = state.tasks.filter(function (t) { return t.projectId === x.id && t.status !== 'done' && t.status !== 'deleted'; }).length; h += '<div class="project-card" onclick="openProjectDialog(\'' + x.id + '\')"><div class="project-card-header"><span class="project-name">' + esc(x.name) + '</span><span class="project-stats">' + tc + ' tasks</span></div>' + (x.description ? '<div class="project-description">' + esc(x.description) + '</div>' : '') + '</div>'; }); return h; }
+        function renderSomeday() { var t = state.tasks.filter(function (x) { return x.status === 'someday'; }); var h = '<div class="page-header"><h2>Someday/Maybe</h2><p>Ideas for the future</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">cloud</span><h3>Dream Big</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
+        function renderReview() { var ic = state.tasks.filter(function (x) { return x.status === 'inbox'; }).length; var h = '<div class="page-header"><h2>Weekly Review</h2><p>Get clear, current, creative</p></div>'; h += '<div class="review-section"><h3><span class="material-icons">inbox</span> Process Inbox</h3><p>' + (ic > 0 ? ic + ' items' : 'Empty!') + '</p>' + (ic > 0 ? '<button class="btn btn-primary" onclick="navigateTo(\'inbox\')">Process</button>' : '') + '</div>'; h += '<div class="review-section"><h3><span class="material-icons">folder</span> Review Projects</h3><button class="btn btn-secondary" onclick="navigateTo(\'projects\')">Review</button></div>'; return h; }
+        function renderContexts() { var h = '<div class="page-header"><h2>Contexts</h2><p>Where you can do tasks</p></div><div class="task-list">'; state.contexts.forEach(function (c) { var n = state.tasks.filter(function (t) { return t.contextId === c.id && t.status === 'next'; }).length; h += '<div class="task-item"><span class="context-icon">' + c.icon + '</span><div class="task-content"><div class="task-title">' + esc(c.name) + '</div></div><span class="task-meta">' + n + ' next</span></div>'; }); h += '</div><button class="add-btn" onclick="addContext()"><span class="material-icons">add</span> Add Context</button>'; return h; }
+        function renderAreas() { var h = '<div class="page-header"><h2>Areas</h2><p>Ongoing responsibilities</p></div><div class="task-list">'; state.areas.forEach(function (a) { var n = state.projects.filter(function (p) { return p.areaId === a.id && p.status === 'active'; }).length; h += '<div class="task-item"><span class="context-icon">' + a.icon + '</span><div class="task-content"><div class="task-title">' + esc(a.name) + '</div></div><span class="task-meta">' + n + ' projects</span></div>'; }); h += '</div><button class="add-btn" onclick="addArea()"><span class="material-icons">add</span> Add Area</button>'; return h; }
+        function taskItem(t) { var ctx = state.contexts.find(function (c) { return c.id === t.contextId; }); var prj = state.projects.find(function (p) { return p.id === t.projectId; }); var h = '<div class="task-item" onclick="openTaskDialog(\'' + t.id + '\')"><div class="task-checkbox" onclick="event.stopPropagation();completeTaskClick(\'' + t.id + '\')"></div><div class="task-content"><div class="task-title">' + esc(t.title) + '</div>'; var m = []; if (ctx) m.push(ctx.icon + ' ' + ctx.name); if (prj) m.push(esc(prj.name)); if (t.dueDate) m.push(t.dueDate); if (m.length > 0) h += '<div class="task-meta">' + m.join(' &bull; ') + '</div>'; h += '</div></div>'; return h; }
+        function handleQuickCapture(e) { if (e.key === 'Enter') submitQuickCapture(); }
+        function submitQuickCapture() { var i = document.getElementById('quickCaptureInput'); var t = i.value.trim(); if (!t) return; google.script.run.withSuccessHandler(function (x) { state.tasks.push(x); updateInboxBadge(); if (state.currentPage === 'inbox') renderPage('inbox'); showToast('Added'); i.value = ''; }).withFailureHandler(function (e) { showToast('Error: ' + e); }).quickCapture(t, ''); }
+        function openTaskDialog(id) { var t = state.tasks.find(function (x) { return x.id === id; }); if (!t) return; state.currentTask = t; document.getElementById('dialogTitle').textContent = 'Edit Task'; document.getElementById('taskTitle').value = t.title; document.getElementById('taskNotes').value = t.notes || ''; document.getElementById('taskStatus').value = t.status; document.getElementById('taskProject').value = t.projectId || ''; document.getElementById('taskContext').value = t.contextId || ''; document.getElementById('taskEnergy').value = t.energyRequired || 'medium'; document.getElementById('taskDueDate').value = t.dueDate || ''; document.getElementById('taskScheduledDate').value = t.scheduledDate || ''; document.getElementById('taskTimeEstimate').value = t.timeEstimate || ''; document.getElementById('taskWaitingFor').value = t.waitingFor || ''; var el = document.getElementById('emailLink'); if (t.emailThreadId) { el.style.display = 'block'; document.getElementById('emailLinkAnchor').href = 'https://mail.google.com/mail/u/0/#inbox/' + t.emailThreadId; } else el.style.display = 'none'; document.getElementById('deleteTaskBtn').style.display = 'inline-flex'; document.getElementById('taskDialog').style.display = 'flex'; }
+        function closeTaskDialog() { document.getElementById('taskDialog').style.display = 'none'; state.currentTask = null; }
+        function saveTask() { if (!state.currentTask) return; var u = { title: document.getElementById('taskTitle').value, notes: document.getElementById('taskNotes').value, status: document.getElementById('taskStatus').value, projectId: document.getElementById('taskProject').value, contextId: document.getElementById('taskContext').value, energyRequired: document.getElementById('taskEnergy').value, dueDate: document.getElementById('taskDueDate').value, scheduledDate: document.getElementById('taskScheduledDate').value, timeEstimate: document.getElementById('taskTimeEstimate').value, waitingFor: document.getElementById('taskWaitingFor').value }; google.script.run.withSuccessHandler(function (r) { if (r.success) { var i = state.tasks.findIndex(function (x) { return x.id === state.currentTask.id; }); if (i !== -1) state.tasks[i] = r.task; closeTaskDialog(); updateInboxBadge(); renderPage(state.currentPage); showToast('Saved'); } else showToast('Error: ' + r.error); }).withFailureHandler(function (e) { showToast('Error: ' + e); }).updateTask(state.currentTask.id, u); }
+        function completeTaskClick(id) { google.script.run.withSuccessHandler(function (r) { if (r.success) { var i = state.tasks.findIndex(function (x) { return x.id === id; }); if (i !== -1) state.tasks[i].status = 'done'; updateInboxBadge(); renderPage(state.currentPage); showToast('Done!'); } }).withFailureHandler(function (e) { showToast('Error: ' + e); }).completeTask(id); }
+        function deleteCurrentTask() { if (!state.currentTask || !confirm('Delete?')) return; google.script.run.withSuccessHandler(function (r) { if (r.success) { var i = state.tasks.findIndex(function (x) { return x.id === state.currentTask.id; }); if (i !== -1) state.tasks.splice(i, 1); closeTaskDialog(); updateInboxBadge(); renderPage(state.currentPage); showToast('Deleted'); } }).withFailureHandler(function (e) { showToast('Error: ' + e); }).deleteTask(state.currentTask.id); }
+        function openProjectDialog(id) { if (id) { var p = state.projects.find(function (x) { return x.id === id; }); if (!p) return; state.currentProject = p; document.getElementById('projectDialogTitle').textContent = 'Edit Project'; document.getElementById('projectName').value = p.name; document.getElementById('projectDescription').value = p.description || ''; document.getElementById('projectStatus').value = p.status; document.getElementById('projectArea').value = p.areaId || ''; document.getElementById('projectDueDate').value = p.dueDate || ''; document.getElementById('deleteProjectBtn').style.display = 'inline-flex'; } else { state.currentProject = null; document.getElementById('projectDialogTitle').textContent = 'New Project'; document.getElementById('projectName').value = ''; document.getElementById('projectDescription').value = ''; document.getElementById('projectStatus').value = 'active'; document.getElementById('projectArea').value = ''; document.getElementById('projectDueDate').value = ''; document.getElementById('deleteProjectBtn').style.display = 'none'; } document.getElementById('projectDialog').style.display = 'flex'; }
+        function closeProjectDialog() { document.getElementById('projectDialog').style.display = 'none'; state.currentProject = null; }
+        function saveProject() { var d = { name: document.getElementById('projectName').value, description: document.getElementById('projectDescription').value, status: document.getElementById('projectStatus').value, areaId: document.getElementById('projectArea').value, dueDate: document.getElementById('projectDueDate').value }; if (state.currentProject) { google.script.run.withSuccessHandler(function (r) { if (r.success) { var i = state.projects.findIndex(function (x) { return x.id === state.currentProject.id; }); if (i !== -1) state.projects[i] = r.project; closeProjectDialog(); populateSelects(); renderPage(state.currentPage); showToast('Saved'); } }).withFailureHandler(function (e) { showToast('Error: ' + e); }).updateProject(state.currentProject.id, d); } else { google.script.run.withSuccessHandler(function (p) { state.projects.push(p); closeProjectDialog(); populateSelects(); renderPage(state.currentPage); showToast('Created'); }).withFailureHandler(function (e) { showToast('Error: ' + e); }).createProject(d); } }
+        function deleteCurrentProject() { if (!state.currentProject || !confirm('Delete?')) return; google.script.run.withSuccessHandler(function (r) { if (r.success) { var i = state.projects.findIndex(function (x) { return x.id === state.currentProject.id; }); if (i !== -1) state.projects.splice(i, 1); closeProjectDialog(); populateSelects(); renderPage(state.currentPage); showToast('Deleted'); } }).withFailureHandler(function (e) { showToast('Error: ' + e); }).deleteProject(state.currentProject.id); }
+        function updateCurrentContext() { google.script.run.updateSetting('currentContext', document.getElementById('currentContext').value); }
+        function updateCurrentEnergy() { google.script.run.updateSetting('currentEnergyLevel', document.getElementById('currentEnergy').value); }
+        function updateInboxBadge() { var c = state.tasks.filter(function (x) { return x.status === 'inbox'; }).length; var b = document.getElementById('inboxBadge'); if (b) b.textContent = c > 0 ? c : ''; }
+        function showLoading(s) { var l = document.getElementById('loading'); var c = document.getElementById('pageContent'); if (l) l.style.display = s ? 'flex' : 'none'; if (c) c.style.display = s ? 'none' : 'block'; }
+        function showToast(m) { var t = document.getElementById('toast'); if (!t) return; t.textContent = m; t.classList.add('show'); setTimeout(function () { t.classList.remove('show'); }, 3000); }
+        function esc(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+        function addContext() { var n = prompt('Context name:'); if (!n) return; var i = prompt('Emoji:', '📋'); google.script.run.withSuccessHandler(function (c) { state.contexts.push(c); populateSelects(); renderPage('contexts'); showToast('Added'); }).withFailureHandler(function (e) { showToast('Error: ' + e); }).createContext({ name: n, icon: i || '📋' }); }
+        function addArea() { var n = prompt('Area name:'); if (!n) return; var i = prompt('Emoji:', '📁'); google.script.run.withSuccessHandler(function (a) { state.areas.push(a); populateSelects(); renderPage('areas'); showToast('Added'); }).withFailureHandler(function (e) { showToast('Error: ' + e); }).createArea({ name: n, icon: i || '📁' }); }
+        document.addEventListener('DOMContentLoaded', function () { init('inbox'); });
+    </script>
+</body>
+
+</html>
