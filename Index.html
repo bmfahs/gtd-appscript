@@ -1258,7 +1258,7 @@
             var h = '<div class="page-header"><h2>Weekly Review</h2><p>Get clear, current, creative</p></div>';
             h += '<div class="review-section"><h3><span class="material-icons">inbox</span> Process Inbox</h3><p>' + (ic > 0 ? ic + ' items' : 'Empty!') + '</p>' + (ic > 0 ? '<button class="btn btn-primary" onclick="navigateTo(\'inbox\')">Process</button>' : '') + '</div>';
             h += '<div class="review-section"><h3><span class="material-icons">folder</span> Review Projects</h3><button class="btn btn-secondary" onclick="navigateTo(\'projects\')">Review</button></div>';
-            h += '<div class="review-section"><h3><span class="material-icons">download</span> Export Data</h3><p>Download a log of all completed tasks and projects.</p><button class="btn btn-secondary" onclick="downloadExport()">Export Log</button></div>';
+            h += '<div class="review-section"><h3><span class="material-icons">download</span> Export Data</h3><p>Download a log of all completed tasks and projects.</p><div style="display:flex; gap:8px"><button class="btn btn-secondary" onclick="downloadExport()">Export Log</button><button class="btn btn-danger" onclick="compactDatabaseClick()">Compact Database</button></div></div>';
             return h;
         }
         function renderContexts() { var h = '<div class="page-header"><h2>Contexts</h2><p>Where you can do tasks</p></div><div class="task-list">'; state.contexts.forEach(function (c) { var n = state.tasks.filter(function (t) { return t.contextId === c.id && t.status === 'next'; }).length; h += '<div class="task-item"><span class="context-icon">' + c.icon + '</span><div class="task-content"><div class="task-title">' + esc(c.name) + '</div></div><span class="task-meta">' + n + ' next</span></div>'; }); h += '</div><button class="add-btn" onclick="addContext()"><span class="material-icons">add</span> Add Context</button>'; return h; }
@@ -1442,6 +1442,18 @@
             }).withFailureHandler(function (e) {
                 showToast('Error: ' + e);
             }).exportCompletedItems();
+        }
+
+        function compactDatabaseClick() {
+            if (!confirm('WARNING: This will PERMANENTLY DELETE all completed tasks, deleted tasks, completed projects, and dropped projects.\n\nThis action cannot be undone.\n\nAre you sure you want to proceed?')) return;
+
+            showToast('Compacting database...');
+            google.script.run.withSuccessHandler(function (r) {
+                showToast('Removed ' + r.tasksRemoved + ' tasks and ' + r.projectsRemoved + ' projects.');
+                loadAllData();
+            }).withFailureHandler(function (e) {
+                showToast('Error: ' + e);
+            }).compactDatabase();
         }
 
         function completeTaskClick(id) {

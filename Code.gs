@@ -493,3 +493,58 @@ function exportCompletedItems() {
   
   return csv;
 }
+
+/**
+ * Compact the database by removing completed/deleted items
+ */
+function compactDatabase() {
+  var result = {
+    tasksRemoved: 0,
+    projectsRemoved: 0
+  };
+  
+  // 1. Compact Tasks
+  var taskSheet = getSheet(SHEETS.TASKS);
+  var taskData = taskSheet.getDataRange().getValues();
+  var taskHeader = taskData[0];
+  var tasksToKeep = [taskHeader];
+  
+  for (var i = 1; i < taskData.length; i++) {
+    var row = taskData[i];
+    var status = row[TASK_COLS.STATUS]; 
+    if (status !== 'done' && status !== 'deleted') {
+      tasksToKeep.push(row);
+    } else {
+      result.tasksRemoved++;
+    }
+  }
+  
+  if (result.tasksRemoved > 0) {
+    taskSheet.clear();
+    taskSheet.getRange(1, 1, tasksToKeep.length, tasksToKeep[0].length).setValues(tasksToKeep);
+  }
+  
+  // 2. Compact Projects
+  var projectSheet = getSheet(SHEETS.PROJECTS);
+  var projectData = projectSheet.getDataRange().getValues();
+  var projectHeader = projectData[0];
+  var projectsToKeep = [projectHeader];
+  
+  for (var j = 1; j < projectData.length; j++) {
+    var pRow = projectData[j];
+    var pStatus = pRow[3]; // Project status index
+    
+    if (pStatus !== 'completed' && pStatus !== 'dropped') {
+      projectsToKeep.push(pRow);
+    } else {
+      result.projectsRemoved++;
+    }
+  }
+  
+  if (result.projectsRemoved > 0) {
+    projectSheet.clear();
+    projectSheet.getRange(1, 1, projectsToKeep.length, projectsToKeep[0].length).setValues(projectsToKeep);
+  }
+  
+  return result;
+}
