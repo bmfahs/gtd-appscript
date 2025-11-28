@@ -61,6 +61,8 @@
     <div class="test">
         <input type="file" id="importFile" accept=".xml">
         <button onclick="importMloData()">Import MLO XML</button>
+        <button onclick="inspectProjects()">Inspect Projects Sheet</button>
+        <button onclick="fixHeaders()">Fix Project Headers</button>
     </div>
 
     <h2>Results</h2>
@@ -150,6 +152,30 @@
                 log('Error reading file', true);
             };
             reader.readAsText(file);
+        }
+
+        function inspectProjects() {
+            log('Inspecting Projects sheet...', false);
+            google.script.run
+                .withSuccessHandler(function (result) {
+                    log('Inspection Result:\n' + JSON.stringify(result, null, 2), false);
+                })
+                .withFailureHandler(function (error) {
+                    log('Inspection FAILED:\n' + (error.message || error), true);
+                })
+                .debugInspectProjectSheet();
+        }
+
+        function fixHeaders() {
+            log('Updating project headers...', false);
+            google.script.run
+                .withSuccessHandler(function (result) {
+                    log('Success: ' + result.message, false);
+                })
+                .withFailureHandler(function (error) {
+                    log('Failed: ' + error, true);
+                })
+                .fixProjectHeaders();
         }
 
         function testInitialize() {

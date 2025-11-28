@@ -148,3 +148,62 @@ function debugRunAllTests() {
   Logger.log('Tests complete. Check logs above.');
   Logger.log('========================================');
 }
+
+/**
+ * Find task by title
+ */
+function debugFindInboxTask() {
+  const tasks = TaskService.getAllTasks();
+  const inboxTasks = tasks.filter(t => t.title.toLowerCase().includes('inbox'));
+  
+  Logger.log('Found ' + inboxTasks.length + ' tasks with "Inbox" in title:');
+  inboxTasks.forEach(t => {
+    Logger.log('- [' + t.id + '] ' + t.title + ' (Status: ' + t.status + ')');
+  });
+  
+  return inboxTasks;
+}
+
+/**
+ * Inspect Projects sheet raw data
+ */
+function debugInspectProjectSheet() {
+  const sheet = getSheet(SHEETS.PROJECTS);
+  const data = sheet.getDataRange().getValues();
+  
+  Logger.log('--- Projects Sheet Inspection ---');
+  Logger.log('Total Rows: ' + data.length);
+  
+  if (data.length > 0) {
+    Logger.log('Headers: ' + JSON.stringify(data[0]));
+    
+    // Check first 5 rows
+    const limit = Math.min(data.length, 6);
+    for (let i = 1; i < limit; i++) {
+      Logger.log('Row ' + i + ': ' + JSON.stringify(data[i]));
+    }
+  }
+  
+  // Helper to safely stringify values
+  const safeData = data.slice(0, 6).map(row => row.map(cell => String(cell)));
+  
+  return {
+    headers: safeData.length > 0 ? safeData[0] : [],
+    sampleRows: safeData.slice(1)
+  };
+}
+
+/**
+ * Fix Project Sheet Headers
+ */
+function fixProjectHeaders() {
+  const sheet = getSheet(SHEETS.PROJECTS);
+  const headers = [
+    'ID', 'Name', 'Description', 'Status', 'Area ID', 
+    'Due Date', 'Created Date', 'Completed Date', 'Sort Order', 'Parent Project ID'
+  ];
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  
+  return { success: true, message: 'Headers updated' };
+}

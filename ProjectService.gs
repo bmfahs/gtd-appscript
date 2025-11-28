@@ -73,7 +73,8 @@ const ProjectService = {
       dueDate: projectData.dueDate || '',
       createdDate: timestamp,
       completedDate: '',
-      sortOrder: projectData.sortOrder || this.getNextSortOrder()
+      sortOrder: projectData.sortOrder || this.getNextSortOrder(),
+      parentProjectId: projectData.parentProjectId || ''
     };
     
     const row = this.projectToRow(project);
@@ -93,7 +94,7 @@ const ProjectService = {
       return { success: false, error: 'Project not found' };
     }
     
-    const data = sheet.getRange(rowNum, 1, 1, 9).getValues()[0];
+    const data = sheet.getRange(rowNum, 1, 1, 10).getValues()[0];
     const project = this.rowToProject(data);
     
     // Apply updates
@@ -192,7 +193,8 @@ const ProjectService = {
       dueDate: formatDate(row[PROJECT_COLS.DUE_DATE]),
       createdDate: formatDateTime(row[PROJECT_COLS.CREATED_DATE]),
       completedDate: formatDateTime(row[PROJECT_COLS.COMPLETED_DATE]),
-      sortOrder: row[PROJECT_COLS.SORT_ORDER] || 0
+      sortOrder: row[PROJECT_COLS.SORT_ORDER] || 0,
+      parentProjectId: row[PROJECT_COLS.PARENT_PROJECT_ID] || ''
     };
   },
   
@@ -200,7 +202,7 @@ const ProjectService = {
    * Convert project object to row array
    */
   projectToRow: function(project) {
-    const row = new Array(9).fill('');
+    const row = new Array(10).fill('');
     row[PROJECT_COLS.ID] = project.id;
     row[PROJECT_COLS.NAME] = project.name;
     row[PROJECT_COLS.DESCRIPTION] = project.description;
@@ -210,6 +212,7 @@ const ProjectService = {
     row[PROJECT_COLS.CREATED_DATE] = project.createdDate;
     row[PROJECT_COLS.COMPLETED_DATE] = project.completedDate;
     row[PROJECT_COLS.SORT_ORDER] = project.sortOrder;
+    row[PROJECT_COLS.PARENT_PROJECT_ID] = project.parentProjectId;
     return row;
   }
 };

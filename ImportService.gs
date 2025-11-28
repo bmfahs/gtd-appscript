@@ -25,6 +25,7 @@ const ImportService = {
         tasksCreated: 0,
         projectsCreated: 0,
         contextsCreated: 0,
+        skipped: 0,
         errors: []
       };
       
@@ -38,6 +39,7 @@ const ImportService = {
         this.processNode(node, null, null, results, contextCache);
       });
       
+      Logger.log('Import completed. Results: ' + JSON.stringify(results));
       return { success: true, results: results };
       
     } catch (e) {
@@ -50,9 +52,11 @@ const ImportService = {
    * Recursive function to process a TaskNode
    */
   processNode: function(node, parentTaskId, currentProjectId, results, contextCache) {
+    let caption = 'Unknown';
     try {
-      const caption = node.getChildText('Caption');
-      const isProject = node.getChildText('IsProject') === '-1';
+      caption = node.getChildText('Caption');
+      // Promote to project if it is one OR contains one
+      const isProject = this.isOrContainsProject(node);
       const note = node.getChildText('Note');
       
       // Handle Contexts (Places)
@@ -93,16 +97,26 @@ const ImportService = {
           description: note || '',
           status: completedDate ? PROJECT_STATUS.COMPLETED : PROJECT_STATUS.ACTIVE,
           dueDate: dueDate,
-          createdDate: now() // MLO doesn't seem to have created date easily accessible in this snippet
+          createdDate: now(), // MLO doesn't seem to have created date easily accessible in this snippet
+          parentProjectId: currentProjectId || ''
         };
         
         if (completedDate) {
           projectData.completedDate = formatDateTime(new Date(completedDate));
         }
         
-        const project = ProjectService.createProject(projectData);
-        newProjectId = project.id;
-        results.projectsCreated++;
+        try {
+            const project = ProjectService.createProject(projectData);
+            newProjectId = project.id;
+            results.projectsCreated++;
+        } catch (err) {
+            results.errors.push('Failed to create project "' + caption + '": ' + err.toString());
+            results.skipped++;
+            return; // Stop processing children if parent failed? Maybe continue?
+            // If project creation failed, we can't link children to it.
+            // Let's continue but children won't have this project ID if we don't handle it.
+            // Actually, if project failed, newProjectId is null (or previous).
+        }
         
       } else {
         // Create Task
@@ -117,24 +131,23 @@ const ImportService = {
           parentTaskId: parentTaskId || ''
         };
         
-        // If completed, set the date
-        if (completedDate) {
-           // We can't easily set completedDate in createTask, so we might need to update it after
-           // Or update createTask to accept it. For now, let's assume createTask handles it or we update.
-           // Actually createTask sets createdDate to now(). 
+        try {
+            const task = TaskService.createTask(taskData);
+            newTaskId = task.id;
+            
+            if (completedDate) {
+              TaskService.updateTask(task.id, { 
+                status: STATUS.DONE, 
+                completedDate: formatDateTime(new Date(completedDate)) 
+              });
+            }
+            
+            results.tasksCreated++;
+        } catch (err) {
+             results.errors.push('Failed to create task "' + caption + '": ' + err.toString());
+             results.skipped++;
+             return; // Stop processing children if parent failed
         }
-        
-        const task = TaskService.createTask(taskData);
-        newTaskId = task.id;
-        
-        if (completedDate) {
-          TaskService.updateTask(task.id, { 
-            status: STATUS.DONE, 
-            completedDate: formatDateTime(new Date(completedDate)) 
-          });
-        }
-        
-        results.tasksCreated++;
       }
       
       // Process Children
@@ -144,8 +157,9 @@ const ImportService = {
       });
       
     } catch (e) {
-      Logger.log('Error processing node: ' + e.toString());
-      results.errors.push('Error processing node: ' + e.toString());
+      Logger.log('Error processing node "' + caption + '": ' + e.toString());
+      results.errors.push('Error processing node "' + caption + '": ' + e.toString());
+      results.skipped++;
     }
   },
 
@@ -195,5 +209,21 @@ const ImportService = {
     // Remove control characters 0-31 except 9 (tab), 10 (LF), 13 (CR)
     // Also remove 127 (DEL)
     return xml.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  },
+
+  /**
+   * Check if node is a project or contains any projects recursively
+   */
+  isOrContainsProject: function(node) {
+    if (node.getChildText('IsProject') === '-1') {
+      return true;
+    }
+    const children = node.getChildren('TaskNode');
+    for (let i = 0; i < children.length; i++) {
+      if (this.isOrContainsProject(children[i])) {
+        return true;
+      }
+    }
+    return false;
   }
 };

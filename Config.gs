@@ -82,7 +82,8 @@ const PROJECT_COLS = {
   DUE_DATE: 5,
   CREATED_DATE: 6,
   COMPLETED_DATE: 7,
-  SORT_ORDER: 8
+  SORT_ORDER: 8,
+  PARENT_PROJECT_ID: 9
 };
 
 // Column indices for Contexts sheet (0-based)

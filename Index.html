@@ -689,6 +689,9 @@
                     <a href="#" class="nav-item" data-page="projects" onclick="navigateTo('projects'); return false;">
                         <span class="material-icons">folder</span><span>Projects</span>
                     </a>
+                    <a href="#" class="nav-item" data-page="all" onclick="navigateTo('all'); return false;">
+                        <span class="material-icons">tree</span><span>All Tasks</span>
+                    </a>
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title">Review</div>
@@ -830,18 +833,216 @@
         var state = { tasks: [], projects: [], contexts: [], areas: [], settings: {}, currentPage: 'inbox', currentTask: null, currentProject: null };
         function init(p) { state.currentPage = p || 'inbox'; loadAllData(); }
         function loadAllData() { showLoading(true); google.script.run.withSuccessHandler(onDataLoaded).withFailureHandler(onDataError).getAllData(); }
-        function onDataLoaded(d) { if (!d) { showToast('No data'); showLoading(false); return; } state.tasks = d.tasks || []; state.projects = d.projects || []; state.contexts = d.contexts || []; state.areas = d.areas || []; state.settings = d.settings || {}; populateSelects(); updateInboxBadge(); navigateTo(state.currentPage); showLoading(false); }
+        function onDataLoaded(d) {
+            if (!d) { showToast('No data'); showLoading(false); return; } state.tasks = d.tasks || []; state.projects = d.projects || []; state.contexts = d.contexts || []; state.areas = d.areas || []; state.settings = d.settings || {};
+            // Find Inbox ID
+            var inboxTask = state.tasks.find(function (t) { return t.title === '<Inbox>' || t.title === 'Inbox'; });
+            state.inboxId = inboxTask ? inboxTask.id : null;
+
+            populateSelects(); updateInboxBadge(); navigateTo(state.currentPage); showLoading(false);
+        }
         function onDataError(e) { showToast('Error: ' + e); showLoading(false); }
         function populateSelects() { var cc = document.getElementById('currentContext'); if (cc) { cc.innerHTML = '<option value="">All Contexts</option>'; state.contexts.forEach(function (c) { cc.innerHTML += '<option value="' + c.id + '">' + c.icon + ' ' + c.name + '</option>'; }); } var ce = document.getElementById('currentEnergy'); if (ce) ce.value = state.settings.currentEnergyLevel || 'medium'; var tp = document.getElementById('taskProject'); if (tp) { tp.innerHTML = '<option value="">No Project</option>'; state.projects.forEach(function (p) { if (p.status === 'active') tp.innerHTML += '<option value="' + p.id + '">' + esc(p.name) + '</option>'; }); } var tc = document.getElementById('taskContext'); if (tc) { tc.innerHTML = '<option value="">No Context</option>'; state.contexts.forEach(function (c) { tc.innerHTML += '<option value="' + c.id + '">' + c.icon + ' ' + c.name + '</option>'; }); } var pa = document.getElementById('projectArea'); if (pa) { pa.innerHTML = '<option value="">No Area</option>'; state.areas.forEach(function (a) { pa.innerHTML += '<option value="' + a.id + '">' + a.icon + ' ' + a.name + '</option>'; }); } }
         function navigateTo(p) { state.currentPage = p; document.querySelectorAll('.nav-item').forEach(function (i) { i.classList.remove('active'); if (i.dataset.page === p) i.classList.add('active'); }); var sb = document.getElementById('sidebar'); if (sb) sb.classList.remove('open'); renderPage(p); }
         function toggleSidebar() { var sb = document.getElementById('sidebar'); if (sb) sb.classList.toggle('open'); }
-        function renderPage(p) { var c = document.getElementById('pageContent'); if (!c) return; var h = ''; if (p === 'inbox') h = renderInbox(); else if (p === 'next') h = renderNext(); else if (p === 'today') h = renderToday(); else if (p === 'scheduled') h = renderScheduled(); else if (p === 'waiting') h = renderWaiting(); else if (p === 'projects') h = renderProjects(); else if (p === 'someday') h = renderSomeday(); else if (p === 'review') h = renderReview(); else if (p === 'contexts') h = renderContexts(); else if (p === 'areas') h = renderAreas(); else h = renderInbox(); c.innerHTML = h; }
-        function renderInbox() { var t = state.tasks.filter(function (x) { return x.status === 'inbox'; }); var h = '<div class="page-header"><h2>Inbox</h2><p>Capture everything, process later</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">inbox</span><h3>Inbox Zero!</h3><p>Everything processed.</p></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
+        function renderPage(p) { var c = document.getElementById('pageContent'); if (!c) return; var h = ''; if (p === 'inbox') h = renderInbox(); else if (p === 'next') h = renderNext(); else if (p === 'today') h = renderToday(); else if (p === 'scheduled') h = renderScheduled(); else if (p === 'waiting') h = renderWaiting(); else if (p === 'projects') h = renderProjects(); else if (p === 'someday') h = renderSomeday(); else if (p === 'review') h = renderReview(); else if (p === 'contexts') h = renderContexts(); else if (p === 'areas') h = renderAreas(); else if (p === 'all') h = renderAllTasks(); else h = renderInbox(); c.innerHTML = h; }
+
+        function renderInbox() {
+            var t;
+            if (state.inboxId) {
+                // If we found an <Inbox> task, show its children
+                t = state.tasks.filter(function (x) { return x.parentTaskId === state.inboxId && x.status !== 'done' && x.status !== 'deleted'; });
+            } else {
+                // Fallback to status
+                t = state.tasks.filter(function (x) { return x.status === 'inbox'; });
+            }
+
+            var h = '<div class="page-header"><h2>Inbox</h2><p>Capture everything, process later</p></div>';
+            if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">inbox</span><h3>Inbox Zero!</h3><p>Everything processed.</p></div>';
+            else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; }
+            return h;
+        }
+
+        function renderAllTasks() {
+            var tree = buildUnifiedTree(state.tasks, state.projects);
+            var h = '<div class="page-header"><h2>All Tasks</h2><p>Unified Hierarchical View</p></div>';
+            h += '<div class="task-list">';
+            h += renderUnifiedTree(tree, 0);
+            h += '</div>';
+            return h;
+        }
+
+        function buildUnifiedTree(tasks, projects) {
+            var map = {};
+            var roots = [];
+
+            // Initialize map with Projects
+            projects.forEach(function (p) {
+                if (p.status !== 'active') return;
+                map[p.id] = { data: p, type: 'project', children: [] };
+            });
+
+            // Initialize map with Tasks
+            tasks.forEach(function (t) {
+                if (t.status === 'deleted' || t.status === 'done') return; // Optional: filter done? User said "All Tasks"
+                map[t.id] = { data: t, type: 'task', children: [] };
+            });
+
+            // Build hierarchy
+            // 1. Link Projects to Parent Projects
+            projects.forEach(function (p) {
+                if (p.status !== 'active') return;
+                var node = map[p.id];
+                if (p.parentProjectId && map[p.parentProjectId]) {
+                    map[p.parentProjectId].children.push(node);
+                } else {
+                    roots.push(node);
+                }
+            });
+
+            // 2. Link Tasks to Parents (Task or Project)
+            tasks.forEach(function (t) {
+                if (t.status === 'deleted' || t.status === 'done') return;
+                var node = map[t.id];
+
+                // Priority: Parent Task > Project
+                var parentId = t.parentTaskId || t.projectId;
+
+                if (parentId && map[parentId]) {
+                    map[parentId].children.push(node);
+                } else {
+                    // If task has no parent task and no project (or parent not found), it's a root
+                    roots.push(node);
+                }
+            });
+
+            // Sort
+            var sorter = function (a, b) {
+                var orderA = a.data.sortOrder || 0;
+                var orderB = b.data.sortOrder || 0;
+                return orderA - orderB;
+            };
+
+            roots.sort(sorter);
+            Object.values(map).forEach(function (node) {
+                node.children.sort(sorter);
+            });
+
+            return roots;
+        }
+
+        function renderUnifiedTree(nodes, level) {
+            var h = '';
+            nodes.forEach(function (node) {
+                var padding = level * 24;
+                var indentStyle = 'style="margin-left: ' + padding + 'px"'; // Use margin for indentation
+
+                if (node.type === 'project') {
+                    // Render Project
+                    var p = node.data;
+                    h += '<div class="project-card" ' + indentStyle + ' onclick="openProjectDialog(\'' + p.id + '\')" style="margin-left: ' + padding + 'px; margin-bottom: 8px; padding: 8px 12px;">';
+                    h += '<div class="project-card-header" style="margin-bottom:0"><span class="project-name" style="font-size:14px"><span class="material-icons" style="font-size:16px; vertical-align:text-bottom; margin-right:4px">folder</span>' + esc(p.name) + '</span></div>';
+                    h += '</div>';
+                } else {
+                    // Render Task
+                    var t = node.data;
+                    // For tasks, we use padding-left on the item if it's in a list, but here we are mixing.
+                    // Let's use a wrapper or just style the item.
+                    // Existing taskItem uses flex. We can add a margin-left style.
+
+                    var ctx = state.contexts.find(function (c) { return c.id === t.contextId; });
+                    var prj = state.projects.find(function (p) { return p.id === t.projectId; });
+
+                    h += '<div class="task-item" style="margin-left: ' + padding + 'px" onclick="openTaskDialog(\'' + t.id + '\')">';
+                    h += '<div class="task-checkbox" onclick="event.stopPropagation();completeTaskClick(\'' + t.id + '\')"></div>';
+                    h += '<div class="task-content">';
+                    h += '<div class="task-title">' + esc(t.title) + '</div>';
+
+                    var m = [];
+                    if (ctx) m.push(ctx.icon + ' ' + ctx.name);
+                    // Don't show project name in meta if we are nested under it? 
+                    // Actually, "All Tasks" might show it for context if flat, but in tree it's redundant if nested.
+                    // But logic is complex to know if parent is the project. 
+                    // Let's keep it simple for now.
+                    if (t.dueDate) m.push(t.dueDate);
+                    if (m.length > 0) h += '<div class="task-meta">' + m.join(' &bull; ') + '</div>';
+
+                    h += '</div></div>';
+                }
+
+                if (node.children.length > 0) {
+                    h += renderUnifiedTree(node.children, level + 1);
+                }
+            });
+            return h;
+        }
         function renderNext() { var t = state.tasks.filter(function (x) { return x.status === 'next'; }); var h = '<div class="page-header"><h2>Next Actions</h2><p>Things ready to do now</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">check_circle</span><h3>No Next Actions</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
         function renderToday() { var td = new Date().toISOString().split('T')[0]; var t = state.tasks.filter(function (x) { return (x.dueDate === td || x.scheduledDate === td) && x.status !== 'done' && x.status !== 'deleted'; }); var h = '<div class="page-header"><h2>Today</h2><p>' + new Date().toLocaleDateString() + '</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">event_available</span><h3>Clear Day</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
         function renderScheduled() { var t = state.tasks.filter(function (x) { return x.status === 'scheduled'; }); var h = '<div class="page-header"><h2>Scheduled</h2><p>Tasks for specific dates</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">event</span><h3>Nothing Scheduled</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
         function renderWaiting() { var t = state.tasks.filter(function (x) { return x.status === 'waiting'; }); var h = '<div class="page-header"><h2>Waiting For</h2><p>Delegated items</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">hourglass_empty</span><h3>Not Waiting</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
-        function renderProjects() { var p = state.projects.filter(function (x) { return x.status === 'active'; }); var h = '<div class="page-header"><h2>Projects</h2><p>Multi-step outcomes</p></div>'; h += '<button class="btn btn-primary" onclick="openProjectDialog()" style="margin-bottom:16px"><span class="material-icons">add</span> New Project</button>'; if (p.length === 0) h += '<div class="empty-state"><span class="material-icons">folder_open</span><h3>No Active Projects</h3></div>'; else p.forEach(function (x) { var tc = state.tasks.filter(function (t) { return t.projectId === x.id && t.status !== 'done' && t.status !== 'deleted'; }).length; h += '<div class="project-card" onclick="openProjectDialog(\'' + x.id + '\')"><div class="project-card-header"><span class="project-name">' + esc(x.name) + '</span><span class="project-stats">' + tc + ' tasks</span></div>' + (x.description ? '<div class="project-description">' + esc(x.description) + '</div>' : '') + '</div>'; }); return h; }
+        function renderProjects() {
+            var projects = state.projects.filter(function (x) { return x.status === 'active'; });
+            var tree = buildProjectTree(projects);
+            var h = '<div class="page-header"><h2>Projects</h2><p>Multi-step outcomes</p></div>';
+            h += '<button class="btn btn-primary" onclick="openProjectDialog()" style="margin-bottom:16px"><span class="material-icons">add</span> New Project</button>';
+
+            if (projects.length === 0) {
+                h += '<div class="empty-state"><span class="material-icons">folder_open</span><h3>No Active Projects</h3></div>';
+            } else {
+                h += renderProjectTree(tree, 0);
+            }
+            return h;
+        }
+
+        function buildProjectTree(projects) {
+            var map = {};
+            var roots = [];
+
+            // Initialize map
+            projects.forEach(function (p) {
+                map[p.id] = { project: p, children: [] };
+            });
+
+            // Build hierarchy
+            projects.forEach(function (p) {
+                if (p.parentProjectId && map[p.parentProjectId]) {
+                    map[p.parentProjectId].children.push(map[p.id]);
+                } else {
+                    roots.push(map[p.id]);
+                }
+            });
+
+            // Sort roots and children by sortOrder
+            var sorter = function (a, b) { return (a.project.sortOrder || 0) - (b.project.sortOrder || 0); };
+            roots.sort(sorter);
+            Object.values(map).forEach(function (node) {
+                node.children.sort(sorter);
+            });
+
+            return roots;
+        }
+
+        function renderProjectTree(nodes, level) {
+            var h = '';
+            nodes.forEach(function (node) {
+                var x = node.project;
+                var tc = state.tasks.filter(function (t) { return t.projectId === x.id && t.status !== 'done' && t.status !== 'deleted'; }).length;
+                var padding = level * 24;
+                var indentStyle = 'style="margin-left: ' + padding + 'px"';
+
+                h += '<div class="project-card" ' + indentStyle + ' onclick="openProjectDialog(\'' + x.id + '\')">';
+                h += '<div class="project-card-header"><span class="project-name">' + esc(x.name) + '</span><span class="project-stats">' + tc + ' tasks</span></div>';
+                if (x.description) {
+                    h += '<div class="project-description">' + esc(x.description) + '</div>';
+                }
+                h += '</div>';
+
+                if (node.children.length > 0) {
+                    h += renderProjectTree(node.children, level + 1);
+                }
+            });
+            return h;
+        }
         function renderSomeday() { var t = state.tasks.filter(function (x) { return x.status === 'someday'; }); var h = '<div class="page-header"><h2>Someday/Maybe</h2><p>Ideas for the future</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">cloud</span><h3>Dream Big</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
         function renderReview() { var ic = state.tasks.filter(function (x) { return x.status === 'inbox'; }).length; var h = '<div class="page-header"><h2>Weekly Review</h2><p>Get clear, current, creative</p></div>'; h += '<div class="review-section"><h3><span class="material-icons">inbox</span> Process Inbox</h3><p>' + (ic > 0 ? ic + ' items' : 'Empty!') + '</p>' + (ic > 0 ? '<button class="btn btn-primary" onclick="navigateTo(\'inbox\')">Process</button>' : '') + '</div>'; h += '<div class="review-section"><h3><span class="material-icons">folder</span> Review Projects</h3><button class="btn btn-secondary" onclick="navigateTo(\'projects\')">Review</button></div>'; return h; }
         function renderContexts() { var h = '<div class="page-header"><h2>Contexts</h2><p>Where you can do tasks</p></div><div class="task-list">'; state.contexts.forEach(function (c) { var n = state.tasks.filter(function (t) { return t.contextId === c.id && t.status === 'next'; }).length; h += '<div class="task-item"><span class="context-icon">' + c.icon + '</span><div class="task-content"><div class="task-title">' + esc(c.name) + '</div></div><span class="task-meta">' + n + ' next</span></div>'; }); h += '</div><button class="add-btn" onclick="addContext()"><span class="material-icons">add</span> Add Context</button>'; return h; }
