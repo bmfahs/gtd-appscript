@@ -980,41 +980,52 @@
             var q = state.searchQuery;
             if (!q) return '<div class="page-header"><h2>Search</h2><p>Type to search...</p></div>';
 
-            var tasks = state.tasks.filter(function (t) {
-                return (t.title && t.title.toLowerCase().includes(q)) ||
-                    (t.notes && t.notes.toLowerCase().includes(q));
-            });
-
-            var projects = state.projects.filter(function (p) {
-                return (p.name && p.name.toLowerCase().includes(q)) ||
-                    (p.description && p.description.toLowerCase().includes(q));
-            });
-
             var h = '<div class="page-header"><h2>Search Results</h2><p>Matches for "' + esc(q) + '"</p></div>';
 
-            if (tasks.length === 0 && projects.length === 0) {
+            // Build full tree
+            var roots = buildUnifiedTree(state.tasks, state.projects);
+
+            // Filter tree
+            var filteredRoots = filterTree(roots, q);
+
+            if (filteredRoots.length === 0) {
                 h += '<div class="empty-state"><span class="material-icons">search_off</span><h3>No matches found</h3></div>';
             } else {
-                if (projects.length > 0) {
-                    h += '<h3>Projects (' + projects.length + ')</h3><div class="task-list" style="margin-bottom: 24px">';
-                    // Reuse project card rendering logic or simplify
-                    projects.forEach(function (p) {
-                        var tc = state.tasks.filter(function (t) { return t.projectId === p.id && t.status !== 'done' && t.status !== 'deleted'; }).length;
-                        h += '<div class="project-card" onclick="openProjectDialog(\'' + p.id + '\')" style="padding: 12px 16px;">';
-                        h += '<div class="project-card-header"><span class="project-name">' + esc(p.name) + '</span><span class="project-stats">' + tc + ' tasks</span></div>';
-                        if (p.description) h += '<div class="project-description">' + esc(p.description) + '</div>';
-                        h += '</div>';
-                    });
-                    h += '</div>';
-                }
-
-                if (tasks.length > 0) {
-                    h += '<h3>Tasks (' + tasks.length + ')</h3><div class="task-list">';
-                    tasks.forEach(function (t) { h += taskItem(t); });
-                    h += '</div>';
-                }
+                h += '<div class="task-list">';
+                h += renderUnifiedTree(filteredRoots, 0);
+                h += '</div>';
             }
             return h;
+        }
+
+        function filterTree(nodes, query) {
+            var res = [];
+            nodes.forEach(function (node) {
+                var match = false;
+                if (node.type === 'project') {
+                    match = (node.data.name && node.data.name.toLowerCase().includes(query)) ||
+                        (node.data.description && node.data.description.toLowerCase().includes(query));
+                } else {
+                    match = (node.data.title && node.data.title.toLowerCase().includes(query)) ||
+                        (node.data.notes && node.data.notes.toLowerCase().includes(query));
+                }
+
+                if (match) {
+                    // If match, keep node and ALL children
+                    res.push(node);
+                } else {
+                    // If no match, check children
+                    var filteredChildren = filterTree(node.children, query);
+                    if (filteredChildren.length > 0) {
+                        // Create a shallow copy to avoid mutating the original node's children if referenced elsewhere
+                        // (Though buildUnifiedTree returns fresh nodes, so mutation is safe-ish, but copy is cleaner)
+                        var newNode = Object.assign({}, node);
+                        newNode.children = filteredChildren;
+                        res.push(newNode);
+                    }
+                }
+            });
+            return res;
         }
 
         // Keyboard Shortcuts
