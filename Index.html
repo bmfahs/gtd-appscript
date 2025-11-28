@@ -1241,7 +1241,51 @@
         function renderAreas() { var h = '<div class="page-header"><h2>Areas</h2><p>Ongoing responsibilities</p></div><div class="task-list">'; state.areas.forEach(function (a) { var n = state.projects.filter(function (p) { return p.areaId === a.id && p.status === 'active'; }).length; h += '<div class="task-item"><span class="context-icon">' + a.icon + '</span><div class="task-content"><div class="task-title">' + esc(a.name) + '</div></div><span class="task-meta">' + n + ' projects</span></div>'; }); h += '</div><button class="add-btn" onclick="addArea()"><span class="material-icons">add</span> Add Area</button>'; return h; }
         function taskItem(t) { var ctx = state.contexts.find(function (c) { return c.id === t.contextId; }); var prj = state.projects.find(function (p) { return p.id === t.projectId; }); var h = '<div class="task-item" onclick="openTaskDialog(\'' + t.id + '\')"><div class="task-checkbox" onclick="event.stopPropagation();completeTaskClick(\'' + t.id + '\')"></div><div class="task-content"><div class="task-title">' + esc(t.title) + '</div>'; var m = []; if (ctx) m.push(ctx.icon + ' ' + ctx.name); if (prj) m.push(esc(prj.name)); if (t.dueDate) m.push(t.dueDate); if (m.length > 0) h += '<div class="task-meta">' + m.join(' &bull; ') + '</div>'; h += '</div></div>'; return h; }
         function handleQuickCapture(e) { if (e.key === 'Enter') submitQuickCapture(); }
-        function submitQuickCapture() { var i = document.getElementById('quickCaptureInput'); var t = i.value.trim(); if (!t) return; google.script.run.withSuccessHandler(function (x) { state.tasks.push(x); updateInboxBadge(); if (state.currentPage === 'inbox') renderPage('inbox'); showToast('Added'); i.value = ''; }).withFailureHandler(function (e) { showToast('Error: ' + e); }).quickCapture(t, ''); }
+        function submitQuickCapture() {
+            var i = document.getElementById('quickCaptureInput');
+            var t = i.value.trim();
+            if (!t) return;
+
+            // Optimistic Update
+            var tempId = 'temp-' + Date.now();
+            var tempTask = {
+                id: tempId,
+                title: t,
+                status: 'inbox',
+                parentTaskId: state.inboxId || '', // Use cached Inbox ID
+                projectId: '',
+                contextId: '',
+                energyRequired: 'medium',
+                notes: '',
+                dueDate: '',
+                createdDate: new Date().toISOString()
+            };
+
+            state.tasks.push(tempTask);
+            updateInboxBadge();
+            if (state.currentPage === 'inbox') renderPage('inbox');
+            showToast('Added');
+            i.value = '';
+
+            google.script.run.withSuccessHandler(function (x) {
+                // Replace temp task with real task
+                var idx = state.tasks.findIndex(function (task) { return task.id === tempId; });
+                if (idx !== -1) {
+                    state.tasks[idx] = x;
+                    // Re-render to ensure correct ID is used for clicks
+                    if (state.currentPage === 'inbox') renderPage('inbox');
+                }
+            }).withFailureHandler(function (e) {
+                // Remove temp task on error
+                var idx = state.tasks.findIndex(function (task) { return task.id === tempId; });
+                if (idx !== -1) {
+                    state.tasks.splice(idx, 1);
+                    updateInboxBadge();
+                    if (state.currentPage === 'inbox') renderPage('inbox');
+                }
+                showToast('Error: ' + e);
+            }).quickCapture(t, '');
+        }
         function openTaskDialog(id) {
             var t = state.tasks.find(function (x) { return x.id === id; });
             if (!t) return;
