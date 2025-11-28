@@ -1297,6 +1297,7 @@
                     else if (state.currentPage === 'all') renderPage('all');
                     else if (state.currentPage === 'contexts') renderPage('contexts');
                     else if (state.currentPage === 'areas') renderPage('areas');
+                    else if (state.currentPage === 'search') renderPage('search');
 
                     showToast('Deleted');
                 } else {
@@ -1305,6 +1306,32 @@
             }).withFailureHandler(function (e) {
                 showToast('Error: ' + e);
             }).deleteTask(state.currentTask.id);
+        }
+
+        function completeTaskClick(id) {
+            // Optimistic update
+            var t = state.tasks.find(function (x) { return x.id === id; });
+            if (t) {
+                t.status = 'done';
+                // Remove from view immediately
+                renderPage(state.currentPage);
+                updateInboxBadge();
+            }
+
+            google.script.run.withSuccessHandler(function (r) {
+                if (r.success) {
+                    showToast('Completed');
+                } else {
+                    // Revert if failed
+                    if (t) {
+                        t.status = r.task ? r.task.status : 'next'; // Fallback
+                        renderPage(state.currentPage);
+                        showToast('Error: ' + (r.error || 'Unknown error'));
+                    }
+                }
+            }).withFailureHandler(function (e) {
+                showToast('Error: ' + e);
+            }).completeTask(id);
         }
         // Custom Parent Project Selector Logic
         function showParentOptions() {
