@@ -104,9 +104,44 @@
             color: var(--primary);
         }
 
+        .search-bar {
+            flex: 1;
+            max-width: 400px;
+            position: relative;
+            margin-right: 16px;
+        }
+
+        .search-bar input {
+            width: 100%;
+            padding: 8px 12px 8px 36px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 14px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            transition: all 0.15s;
+        }
+
+        .search-bar input:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: var(--bg-primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .search-bar .material-icons {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            pointer-events: none;
+            font-size: 20px;
+        }
+
         .quick-capture {
             flex: 1;
-            max-width: 500px;
+            max-width: 600px;
             display: flex;
             gap: 8px;
         }
@@ -668,6 +703,10 @@
                 </button>
                 <h1 class="logo">GTD</h1>
             </div>
+            <div class="search-bar">
+                <span class="material-icons">search</span>
+                <input type="text" id="searchInput" placeholder="Search..." onkeyup="handleSearch(event)">
+            </div>
             <div class="quick-capture">
                 <input type="text" id="quickCaptureInput" placeholder="Quick capture... (press Enter)"
                     onkeypress="handleQuickCapture(event)">
@@ -886,7 +925,73 @@
         function populateSelects() { var cc = document.getElementById('currentContext'); if (cc) { cc.innerHTML = '<option value="">All Contexts</option>'; state.contexts.forEach(function (c) { cc.innerHTML += '<option value="' + c.id + '">' + c.icon + ' ' + c.name + '</option>'; }); } var ce = document.getElementById('currentEnergy'); if (ce) ce.value = state.settings.currentEnergyLevel || 'medium'; var tp = document.getElementById('taskProject'); if (tp) { tp.innerHTML = '<option value="">No Project</option>'; state.projects.forEach(function (p) { if (p.status === 'active') tp.innerHTML += '<option value="' + p.id + '">' + esc(p.name) + '</option>'; }); } var tc = document.getElementById('taskContext'); if (tc) { tc.innerHTML = '<option value="">No Context</option>'; state.contexts.forEach(function (c) { tc.innerHTML += '<option value="' + c.id + '">' + c.icon + ' ' + c.name + '</option>'; }); } var pa = document.getElementById('projectArea'); if (pa) { pa.innerHTML = '<option value="">No Area</option>'; state.areas.forEach(function (a) { pa.innerHTML += '<option value="' + a.id + '">' + a.icon + ' ' + a.name + '</option>'; }); } }
         function navigateTo(p) { state.currentPage = p; document.querySelectorAll('.nav-item').forEach(function (i) { i.classList.remove('active'); if (i.dataset.page === p) i.classList.add('active'); }); var sb = document.getElementById('sidebar'); if (sb) sb.classList.remove('open'); renderPage(p); }
         function toggleSidebar() { var sb = document.getElementById('sidebar'); if (sb) sb.classList.toggle('open'); }
-        function renderPage(p) { var c = document.getElementById('pageContent'); if (!c) return; var h = ''; if (p === 'inbox') h = renderInbox(); else if (p === 'next') h = renderNext(); else if (p === 'today') h = renderToday(); else if (p === 'scheduled') h = renderScheduled(); else if (p === 'waiting') h = renderWaiting(); else if (p === 'projects') h = renderProjects(); else if (p === 'someday') h = renderSomeday(); else if (p === 'review') h = renderReview(); else if (p === 'contexts') h = renderContexts(); else if (p === 'areas') h = renderAreas(); else if (p === 'all') h = renderAllTasks(); else h = renderInbox(); c.innerHTML = h; }
+        function renderPage(p) { var c = document.getElementById('pageContent'); if (!c) return; var h = ''; if (p === 'inbox') h = renderInbox(); else if (p === 'next') h = renderNext(); else if (p === 'today') h = renderToday(); else if (p === 'scheduled') h = renderScheduled(); else if (p === 'waiting') h = renderWaiting(); else if (p === 'projects') h = renderProjects(); else if (p === 'someday') h = renderSomeday(); else if (p === 'review') h = renderReview(); else if (p === 'contexts') h = renderContexts(); else if (p === 'areas') h = renderAreas(); else if (p === 'all') h = renderAllTasks(); else if (p === 'search') h = renderSearchResults(); else h = renderInbox(); c.innerHTML = h; }
+
+        // Search Logic
+        var searchTimeout;
+        function handleSearch(e) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(function () {
+                var query = e.target.value.trim().toLowerCase();
+                if (query.length > 0) {
+                    state.searchQuery = query;
+                    navigateTo('search');
+                } else {
+                    state.searchQuery = '';
+                    if (state.currentPage === 'search') navigateTo('inbox');
+                }
+            }, 300); // Debounce
+        }
+
+        function renderSearchResults() {
+            var q = state.searchQuery;
+            if (!q) return '<div class="page-header"><h2>Search</h2><p>Type to search...</p></div>';
+
+            var tasks = state.tasks.filter(function (t) {
+                return (t.title && t.title.toLowerCase().includes(q)) ||
+                    (t.notes && t.notes.toLowerCase().includes(q));
+            });
+
+            var projects = state.projects.filter(function (p) {
+                return (p.name && p.name.toLowerCase().includes(q)) ||
+                    (p.description && p.description.toLowerCase().includes(q));
+            });
+
+            var h = '<div class="page-header"><h2>Search Results</h2><p>Matches for "' + esc(q) + '"</p></div>';
+
+            if (tasks.length === 0 && projects.length === 0) {
+                h += '<div class="empty-state"><span class="material-icons">search_off</span><h3>No matches found</h3></div>';
+            } else {
+                if (projects.length > 0) {
+                    h += '<h3>Projects (' + projects.length + ')</h3><div class="task-list" style="margin-bottom: 24px">';
+                    // Reuse project card rendering logic or simplify
+                    projects.forEach(function (p) {
+                        var tc = state.tasks.filter(function (t) { return t.projectId === p.id && t.status !== 'done' && t.status !== 'deleted'; }).length;
+                        h += '<div class="project-card" onclick="openProjectDialog(\'' + p.id + '\')" style="padding: 12px 16px;">';
+                        h += '<div class="project-card-header"><span class="project-name">' + esc(p.name) + '</span><span class="project-stats">' + tc + ' tasks</span></div>';
+                        if (p.description) h += '<div class="project-description">' + esc(p.description) + '</div>';
+                        h += '</div>';
+                    });
+                    h += '</div>';
+                }
+
+                if (tasks.length > 0) {
+                    h += '<h3>Tasks (' + tasks.length + ')</h3><div class="task-list">';
+                    tasks.forEach(function (t) { h += taskItem(t); });
+                    h += '</div>';
+                }
+            }
+            return h;
+        }
+
+        // Keyboard Shortcuts
+        document.addEventListener('keydown', function (e) {
+            // '/' to focus search
+            if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                document.getElementById('searchInput').focus();
+            }
+        });
 
         function getInboxTasks() {
             if (!state.inboxId) {
