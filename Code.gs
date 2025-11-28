@@ -186,10 +186,23 @@ function updateSetting(key, value) {
  * Quick capture - add to inbox
  */
 function quickCapture(title, notes) {
+  var parentId = '';
+  
+  // Find Inbox task to use as parent
+  var tasks = TaskService.getAllTasks();
+  var inboxTask = tasks.find(function(t) { 
+    return t.title === '<Inbox>' || t.title === 'Inbox'; 
+  });
+  
+  if (inboxTask) {
+    parentId = inboxTask.id;
+  }
+
   return TaskService.createTask({
     title: title,
     notes: notes || '',
-    status: STATUS.INBOX
+    status: STATUS.INBOX,
+    parentTaskId: parentId
   });
 }
 
