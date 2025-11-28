@@ -113,24 +113,38 @@ function initializeSystem() {
  * Get all data for initial load
  */
 function getAllData() {
+  Logger.log('getAllData() called');
   try {
-    return {
+    const data = {
       tasks: TaskService.getAllTasks(),
       projects: ProjectService.getAllProjects(),
       contexts: ContextService.getAllContexts(),
       areas: AreaService.getAllAreas(),
       settings: getSettings()
     };
+    Logger.log('getAllData() success, returning data keys: ' + Object.keys(data).join(', '));
+    return data;
   } catch (e) {
+    Logger.log('getAllData() error: ' + e.toString());
+    Logger.log('Stack: ' + e.stack);
+    
     // If sheets don't exist, initialize first
-    initializeSystem();
-    return {
-      tasks: TaskService.getAllTasks(),
-      projects: ProjectService.getAllProjects(),
-      contexts: ContextService.getAllContexts(),
-      areas: AreaService.getAllAreas(),
-      settings: getSettings()
-    };
+    try {
+      Logger.log('Attempting to initialize system...');
+      initializeSystem();
+      const data = {
+        tasks: TaskService.getAllTasks(),
+        projects: ProjectService.getAllProjects(),
+        contexts: ContextService.getAllContexts(),
+        areas: AreaService.getAllAreas(),
+        settings: getSettings()
+      };
+      Logger.log('getAllData() success after init');
+      return data;
+    } catch (e2) {
+      Logger.log('getAllData() fatal error: ' + e2.toString());
+      throw e2;
+    }
   }
 }
 
@@ -362,4 +376,11 @@ function debugReadTasks() {
   }
   
   return result;
+}
+
+/**
+ * Import MLO Data
+ */
+function importMloData(xmlContent) {
+  return ImportService.importMloXml(xmlContent);
 }

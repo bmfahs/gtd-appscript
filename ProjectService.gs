@@ -190,8 +190,8 @@ const ProjectService = {
       status: row[PROJECT_COLS.STATUS] || PROJECT_STATUS.ACTIVE,
       areaId: row[PROJECT_COLS.AREA_ID] || '',
       dueDate: formatDate(row[PROJECT_COLS.DUE_DATE]),
-      createdDate: row[PROJECT_COLS.CREATED_DATE] || '',
-      completedDate: row[PROJECT_COLS.COMPLETED_DATE] || '',
+      createdDate: formatDateTime(row[PROJECT_COLS.CREATED_DATE]),
+      completedDate: formatDateTime(row[PROJECT_COLS.COMPLETED_DATE]),
       sortOrder: row[PROJECT_COLS.SORT_ORDER] || 0
     };
   },

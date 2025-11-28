@@ -57,6 +57,12 @@
     <button onclick="testGetAllData()">5. Test getAllData()</button>
     <button onclick="testQuickCapture()">6. Test quickCapture()</button>
 
+    <h2>Import Data</h2>
+    <div class="test">
+        <input type="file" id="importFile" accept=".xml">
+        <button onclick="importMloData()">Import MLO XML</button>
+    </div>
+
     <h2>Results</h2>
     <div id="output"></div>
 
@@ -113,6 +119,37 @@
                 .withSuccessHandler(function (task) { log('quickCapture() SUCCESS:\n' + JSON.stringify(task, null, 2), false); })
                 .withFailureHandler(function (error) { log('quickCapture() FAILED:\n' + (error.message || error), true); })
                 .quickCapture(title, 'Test notes');
+        }
+
+        function importMloData() {
+            var fileInput = document.getElementById('importFile');
+            var file = fileInput.files[0];
+
+            if (!file) {
+                log('Please select a file first.', true);
+                return;
+            }
+
+            log('Reading file: ' + file.name + '...', false);
+
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var content = e.target.result;
+                log('File read (' + content.length + ' bytes). Sending to server...', false);
+
+                google.script.run
+                    .withSuccessHandler(function (result) {
+                        log('Import Result:\n' + JSON.stringify(result, null, 2), !result.success);
+                    })
+                    .withFailureHandler(function (error) {
+                        log('Import FAILED:\n' + (error.message || error), true);
+                    })
+                    .importMloData(content);
+            };
+            reader.onerror = function (e) {
+                log('Error reading file', true);
+            };
+            reader.readAsText(file);
         }
 
         function testInitialize() {
