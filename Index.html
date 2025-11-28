@@ -1138,13 +1138,15 @@
             var h = '';
             nodes.forEach(function (node) {
                 var padding = level * 24;
-                var indentStyle = 'style="margin-left: ' + padding + 'px"'; // Use margin for indentation
+                // Combine styles into one string
+                var commonStyle = 'margin-left: ' + padding + 'px; margin-bottom: 8px; padding: 12px; display: flex; align-items: center; gap: 12px;';
 
                 if (node.type === 'project') {
                     // Render Project
                     var p = node.data;
-                    h += '<div class="project-card" ' + indentStyle + ' onclick="openProjectDialog(\'' + p.id + '\')" style="margin-left: ' + padding + 'px; margin-bottom: 8px; padding: 8px 12px;">';
-                    h += '<div class="project-card-header" style="margin-bottom:0"><span class="project-name" style="font-size:14px"><span class="material-icons" style="font-size:16px; vertical-align:text-bottom; margin-right:4px">folder</span>' + esc(p.name) + '</span></div>';
+                    h += '<div class="project-card" onclick="openProjectDialog(\'' + p.id + '\')" style="' + commonStyle + '">';
+                    h += '<div class="task-checkbox" onclick="event.stopPropagation();completeProjectClick(\'' + p.id + '\')"></div>';
+                    h += '<div style="flex: 1; font-weight: 600; font-size: 14px; color: var(--text-primary); display: flex; align-items: center;"><span class="material-icons" style="font-size: 18px; margin-right: 6px; color: var(--text-muted);">folder</span>' + esc(p.name) + '</div>';
                     h += '</div>';
                 } else {
                     // Render Task
@@ -1231,13 +1233,13 @@
                 var x = node.project;
                 var tc = state.tasks.filter(function (t) { return t.projectId === x.id && t.status !== 'done' && t.status !== 'deleted'; }).length;
                 var padding = level * 24;
-                var indentStyle = 'style="margin-left: ' + padding + 'px"';
 
-                h += '<div class="project-card" ' + indentStyle + ' onclick="openProjectDialog(\'' + x.id + '\')">';
-                h += '<div class="project-card-header"><span class="project-name">' + esc(x.name) + '</span><span class="project-stats">' + tc + ' tasks</span></div>';
-                if (x.description) {
-                    h += '<div class="project-description">' + esc(x.description) + '</div>';
-                }
+                var style = 'margin-left: ' + padding + 'px; margin-bottom: 8px; padding: 12px; display: flex; align-items: center; gap: 12px;';
+
+                h += '<div class="project-card" onclick="openProjectDialog(\'' + x.id + '\')" style="' + style + '">';
+                h += '<div class="task-checkbox" onclick="event.stopPropagation();completeProjectClick(\'' + x.id + '\')"></div>';
+                h += '<div style="flex: 1; font-weight: 600; font-size: 14px; color: var(--text-primary); display: flex; align-items: center;"><span class="material-icons" style="font-size: 18px; margin-right: 6px; color: var(--text-muted);">folder</span>' + esc(x.name) + '</div>';
+                h += '<div class="project-stats" style="margin-left: auto;">' + tc + ' tasks</div>';
                 h += '</div>';
 
                 if (node.children.length > 0) {
@@ -1329,7 +1331,30 @@
             document.getElementById('taskDialog').style.display = 'none';
             state.currentTask = null;
         }
+        function completeProjectClick(id) {
+            // Optimistic update
+            var p = state.projects.find(function (x) { return x.id === id; });
+            if (p) {
+                p.status = 'completed';
+                // Remove from view immediately
+                renderPage(state.currentPage);
+            }
 
+            google.script.run.withSuccessHandler(function (r) {
+                if (r.success) {
+                    showToast('Project Completed');
+                } else {
+                    // Revert if failed
+                    if (p) {
+                        p.status = 'active'; // Fallback
+                        renderPage(state.currentPage);
+                        showToast('Error: ' + (r.error || 'Unknown error'));
+                    }
+                }
+            }).withFailureHandler(function (e) {
+                showToast('Error: ' + e);
+            }).completeProject(id);
+        }
         function deleteCurrentTask() {
             if (!state.currentTask || !confirm('Delete task?')) return;
 
