@@ -466,3 +466,30 @@ function debugReadTasks() {
 function importMloData(xmlContent) {
   return ImportService.importMloXml(xmlContent);
 }
+
+/**
+ * Export completed items as CSV
+ */
+function exportCompletedItems() {
+  var tasks = TaskService.getTasksByStatus(STATUS.DONE);
+  var projects = ProjectService.getCompletedProjects();
+  
+  var csv = 'Type,Title,CompletedDate,Notes\n';
+  
+  projects.forEach(function(p) {
+    var date = p.completedDate ? new Date(p.completedDate).toLocaleDateString() : '';
+    // Escape quotes in title/notes
+    var title = (p.name || '').replace(/"/g, '""');
+    var notes = (p.description || '').replace(/"/g, '""');
+    csv += '"Project","' + title + '","' + date + '","' + notes + '"\n';
+  });
+  
+  tasks.forEach(function(t) {
+    var date = t.completedDate ? new Date(t.completedDate).toLocaleDateString() : '';
+    var title = (t.title || '').replace(/"/g, '""');
+    var notes = (t.notes || '').replace(/"/g, '""');
+    csv += '"Task","' + title + '","' + date + '","' + notes + '"\n';
+  });
+  
+  return csv;
+}
