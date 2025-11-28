@@ -281,6 +281,42 @@ function completeProject(projectId) {
 }
 
 /**
+ * Convert a task to a project
+ */
+function convertTaskToProject(taskId) {
+  var task = TaskService.getTask(taskId);
+  if (!task) return { success: false, error: 'Task not found' };
+  
+  // 1. Create Project
+  var projectData = {
+    name: task.title,
+    description: task.notes,
+    status: 'active',
+    areaId: '', // Could inherit context mapping if we had it, but blank is safer
+    dueDate: task.dueDate
+  };
+  
+  var newProject = ProjectService.createProject(projectData);
+  
+  // 2. Move Children
+  var allTasks = TaskService.getAllTasks();
+  var children = allTasks.filter(function(t) { return t.parentTaskId === taskId; });
+  
+  children.forEach(function(child) {
+    TaskService.updateTask(child.id, {
+      parentTaskId: '', // Clear parent task
+      projectId: newProject.id // Set new project
+    });
+  });
+  
+  // 3. Delete Original Task
+  // We use hard delete here because we are "moving" it to a project
+  TaskService.hardDeleteTask(taskId);
+  
+  return { success: true, project: newProject };
+}
+
+/**
  * Delete a task
  */
 function deleteTask(taskId) {

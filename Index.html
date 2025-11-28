@@ -877,8 +877,12 @@
                     </div>
                 </div>
                 <div class="dialog-footer">
-                    <button class="btn btn-danger" id="deleteTaskBtn" onclick="deleteCurrentTask()"><span
-                            class="material-icons">delete</span>Delete</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-danger" id="deleteTaskBtn" onclick="deleteCurrentTask()"><span
+                                class="material-icons">delete</span>Delete</button>
+                        <button class="btn btn-secondary" id="convertTaskBtn" onclick="convertCurrentTask()"><span
+                                class="material-icons">transform</span>Convert to Project</button>
+                    </div>
                     <div class="dialog-footer-right">
                         <button class="btn btn-secondary" onclick="closeTaskDialog()">Cancel</button>
                         <button class="btn btn-primary" onclick="saveTask()">Save</button>
@@ -1326,7 +1330,34 @@
             document.getElementById('deleteTaskBtn').style.display = 'inline-flex';
             document.getElementById('taskDialog').style.display = 'flex';
         }
+        function convertCurrentTask() {
+            if (!state.currentTask || !confirm('Convert this task to a project? The task will be deleted and its sub-tasks moved.')) return;
 
+            var taskId = state.currentTask.id;
+            showToast('Converting...');
+            closeTaskDialog();
+
+            // Optimistic update: Remove task from view
+            var idx = state.tasks.findIndex(function (x) { return x.id === taskId; });
+            if (idx !== -1) {
+                state.tasks.splice(idx, 1);
+                renderPage(state.currentPage);
+            }
+
+            google.script.run.withSuccessHandler(function (r) {
+                if (r.success) {
+                    showToast('Converted to Project');
+                    // Reload all data to ensure project list and task hierarchy are correct
+                    loadAllData();
+                } else {
+                    showToast('Error: ' + (r.error || 'Unknown error'));
+                    loadAllData(); // Revert on error
+                }
+            }).withFailureHandler(function (e) {
+                showToast('Error: ' + e);
+                loadAllData(); // Revert on error
+            }).convertTaskToProject(taskId);
+        }
         function closeTaskDialog() {
             document.getElementById('taskDialog').style.display = 'none';
             state.currentTask = null;
