@@ -70,7 +70,7 @@ const ImportService = {
   /**
    * Recursive function to process a TaskNode
    */
-  processNode: function(node, parentTaskId, currentProjectId, results, contextCache, tasksToCreate, projectsToCreate) {
+  processNode: function(node, parentTaskId, currentProjectId, results, contextCache, tasksToCreate, projectsToCreate, isInsideInbox = false) {
     let caption = 'Unknown';
     try {
       // Caption is an attribute, not a child element
@@ -83,9 +83,16 @@ const ImportService = {
       if (!caption || caption.trim() === '') {
         const children = node.getChildren('TaskNode');
         children.forEach(child => {
-          this.processNode(child, parentTaskId, currentProjectId, results, contextCache, tasksToCreate, projectsToCreate);
+          this.processNode(child, parentTaskId, currentProjectId, results, contextCache, tasksToCreate, projectsToCreate, isInsideInbox);
         });
         return;
+      }
+
+      // Check if this is the <Inbox> folder
+      // If so, all children are inside inbox
+      let childIsInsideInbox = isInsideInbox;
+      if (caption === '<Inbox>') {
+        childIsInsideInbox = true;
       }
       
       // Promote to project if it is one OR contains one
@@ -108,13 +115,17 @@ const ImportService = {
       const completedDate = this.parseMloDate(node.getChildText('CompletionDateTime'));
       
       // Determine Status
-      let status = STATUS.INBOX;
+      let status = STATUS.INBOX; // Default
+      
       if (completedDate) {
         status = STATUS.DONE;
       } else if (startDate && new Date(startDate) > new Date()) {
         status = STATUS.SCHEDULED;
       } else if (dueDate) {
         status = STATUS.NEXT;
+      } else {
+        // If inside <Inbox>, keep as Inbox. Otherwise default to Next Action.
+        status = childIsInsideInbox ? STATUS.INBOX : STATUS.NEXT;
       }
       
       let newProjectId = currentProjectId;
@@ -174,7 +185,7 @@ const ImportService = {
       // Process Children
       const children = node.getChildren('TaskNode');
       children.forEach(child => {
-        this.processNode(child, newTaskId, newProjectId, results, contextCache, tasksToCreate, projectsToCreate);
+        this.processNode(child, newTaskId, newProjectId, results, contextCache, tasksToCreate, projectsToCreate, childIsInsideInbox);
       });
       
     } catch (err) {
