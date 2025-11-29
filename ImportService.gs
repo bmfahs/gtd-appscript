@@ -79,6 +79,15 @@ const ImportService = {
         caption = captionAttr.getValue();
       }
       
+      // Skip empty nodes (often root containers), but process their children
+      if (!caption || caption.trim() === '') {
+        const children = node.getChildren('TaskNode');
+        children.forEach(child => {
+          this.processNode(child, parentTaskId, currentProjectId, results, contextCache, tasksToCreate, projectsToCreate);
+        });
+        return;
+      }
+      
       // Promote to project if it is one OR contains one
       const isProject = this.isOrContainsProject(node);
       const note = node.getChildText('Note');
