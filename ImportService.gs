@@ -35,9 +35,28 @@ const ImportService = {
       const contextCache = {};
       ContextService.getAllContexts().forEach(c => contextCache[c.name.toLowerCase()] = c);
       
+      // Batch containers
+      const tasksToCreate = [];
+      const projectsToCreate = [];
+      
       nodes.forEach(node => {
-        this.processNode(node, null, null, results, contextCache);
+        this.processNode(node, null, null, results, contextCache, tasksToCreate, projectsToCreate);
       });
+      
+      Logger.log('Tasks to create: ' + tasksToCreate.length);
+      if (tasksToCreate.length > 0) {
+        Logger.log('First task sample: ' + JSON.stringify(tasksToCreate[0]));
+        const taskSheet = getSheet(SHEETS.TASKS);
+        const taskRows = tasksToCreate.map(t => objectToRow(t, TASK_COLS));
+        Logger.log('First task row sample: ' + JSON.stringify(taskRows[0]));
+        taskSheet.getRange(taskSheet.getLastRow() + 1, 1, taskRows.length, taskRows[0].length).setValues(taskRows);
+      }
+      
+      if (projectsToCreate.length > 0) {
+        const projectSheet = getSheet(SHEETS.PROJECTS);
+        const projectRows = projectsToCreate.map(p => objectToRow(p, PROJECT_COLS));
+        projectSheet.getRange(projectSheet.getLastRow() + 1, 1, projectRows.length, projectRows[0].length).setValues(projectRows);
+      }
       
       Logger.log('Import completed. Results: ' + JSON.stringify(results));
       return { success: true, results: results };
@@ -51,10 +70,15 @@ const ImportService = {
   /**
    * Recursive function to process a TaskNode
    */
-  processNode: function(node, parentTaskId, currentProjectId, results, contextCache) {
+  processNode: function(node, parentTaskId, currentProjectId, results, contextCache, tasksToCreate, projectsToCreate) {
     let caption = 'Unknown';
     try {
-      caption = node.getChildText('Caption');
+      // Caption is an attribute, not a child element
+      const captionAttr = node.getAttribute('Caption');
+      if (captionAttr) {
+        caption = captionAttr.getValue();
+      }
+      
       // Promote to project if it is one OR contains one
       const isProject = this.isOrContainsProject(node);
       const note = node.getChildText('Note');
@@ -82,148 +106,138 @@ const ImportService = {
         status = STATUS.SCHEDULED;
       } else if (dueDate) {
         status = STATUS.NEXT;
-      } else if (isProject) {
-        // Projects don't have task status usually, but we need one if it's treated as a task too?
-        // In this system, Projects are separate entities.
       }
       
       let newProjectId = currentProjectId;
       let newTaskId = null;
+      const timestamp = now();
       
       if (isProject) {
-        // Create Project
+        // Create Project Object
+        const projectId = generateUUID();
         const projectData = {
+          id: projectId,
           name: caption,
           description: note || '',
           status: completedDate ? PROJECT_STATUS.COMPLETED : PROJECT_STATUS.ACTIVE,
+          areaId: '', // Default
           dueDate: dueDate,
-          createdDate: now(), // MLO doesn't seem to have created date easily accessible in this snippet
+          createdDate: timestamp,
+          completedDate: completedDate ? formatDateTime(new Date(completedDate)) : '',
+          sortOrder: 0, // Default
           parentProjectId: currentProjectId || ''
         };
         
-        if (completedDate) {
-          projectData.completedDate = formatDateTime(new Date(completedDate));
-        }
-        
-        try {
-            const project = ProjectService.createProject(projectData);
-            newProjectId = project.id;
-            results.projectsCreated++;
-        } catch (err) {
-            results.errors.push('Failed to create project "' + caption + '": ' + err.toString());
-            results.skipped++;
-            return; // Stop processing children if parent failed? Maybe continue?
-            // If project creation failed, we can't link children to it.
-            // Let's continue but children won't have this project ID if we don't handle it.
-            // Actually, if project failed, newProjectId is null (or previous).
-        }
+        projectsToCreate.push(projectData);
+        results.projectsCreated++;
+        newProjectId = projectId;
         
       } else {
-        // Create Task
+        // Create Task Object
+        const taskId = generateUUID();
         const taskData = {
+          id: taskId,
           title: caption,
           notes: note || '',
           status: status,
           projectId: currentProjectId || '',
           contextId: contextId,
+          waitingFor: '',
           dueDate: dueDate,
           scheduledDate: startDate,
-          parentTaskId: parentTaskId || ''
+          completedDate: completedDate ? formatDateTime(new Date(completedDate)) : '',
+          createdDate: timestamp,
+          modifiedDate: timestamp,
+          emailId: '',
+          emailThreadId: '',
+          priority: 0,
+          energyRequired: ENERGY.MEDIUM,
+          timeEstimate: '',
+          parentTaskId: parentTaskId || '',
+          sortOrder: 0
         };
         
-        try {
-            const task = TaskService.createTask(taskData);
-            newTaskId = task.id;
-            
-            if (completedDate) {
-              TaskService.updateTask(task.id, { 
-                status: STATUS.DONE, 
-                completedDate: formatDateTime(new Date(completedDate)) 
-              });
-            }
-            
-            results.tasksCreated++;
-        } catch (err) {
-             results.errors.push('Failed to create task "' + caption + '": ' + err.toString());
-             results.skipped++;
-             return; // Stop processing children if parent failed
-        }
+        tasksToCreate.push(taskData);
+        results.tasksCreated++;
+        newTaskId = taskId;
       }
       
       // Process Children
       const children = node.getChildren('TaskNode');
       children.forEach(child => {
-        this.processNode(child, newTaskId, newProjectId, results, contextCache);
+        this.processNode(child, newTaskId, newProjectId, results, contextCache, tasksToCreate, projectsToCreate);
       });
       
-    } catch (e) {
-      Logger.log('Error processing node "' + caption + '": ' + e.toString());
-      results.errors.push('Error processing node "' + caption + '": ' + e.toString());
+    } catch (err) {
+      results.errors.push('Failed to process node "' + caption + '": ' + err.toString());
       results.skipped++;
     }
   },
 
   /**
-   * Get or create context by name
-   */
-  getOrCreateContextId: function(name, results, contextCache) {
-    if (!name) return '';
-    
-    // Clean name (remove @ or ! prefix often used in MLO)
-    const cleanName = name.replace(/^[@!]/, '').trim();
-    const key = cleanName.toLowerCase();
-    
-    if (contextCache[key]) {
-      return contextCache[key].id;
-    }
-    
-    // Create new context
-    const newContext = ContextService.createContext({
-      name: cleanName,
-      icon: '🏷️' // Default icon
-    });
-    
-    contextCache[key] = newContext;
-    results.contextsCreated++;
-    return newContext.id;
-  },
-
-  /**
-   * Parse MLO date string (ISO 8601ish) to YYYY-MM-DD
-   */
-  parseMloDate: function(dateStr) {
-    if (!dateStr) return '';
-    try {
-      const date = new Date(dateStr);
-      return formatDate(date);
-    } catch (e) {
-      return '';
-    }
-  },
-
-  /**
-   * Remove invalid XML characters
-   */
-  sanitizeXml: function(xml) {
-    if (!xml) return '';
-    // Remove control characters 0-31 except 9 (tab), 10 (LF), 13 (CR)
-    // Also remove 127 (DEL)
-    return xml.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-  },
-
-  /**
-   * Check if node is a project or contains any projects recursively
+   * Check if node is a project or contains sub-projects
    */
   isOrContainsProject: function(node) {
-    if (node.getChildText('IsProject') === '-1') {
-      return true;
-    }
+    // Check explicit flags
+    if (node.getChildText('IsProject') === '-1' || node.getChildText('IsProject') === 'true') return true;
+    if (node.getAttribute('IsFolder') === 'true' || node.getChildText('IsFolder') === 'true') return true;
+    
+    // Recursive check: If it contains a project, it should be treated as a project (container)
     const children = node.getChildren('TaskNode');
     for (let i = 0; i < children.length; i++) {
       if (this.isOrContainsProject(children[i])) {
         return true;
       }
     }
+    
     return false;
+  },
+
+  /**
+   * Get or create context
+   */
+  getOrCreateContextId: function(contextName, results, contextCache) {
+    const key = contextName.toLowerCase();
+    if (contextCache[key]) {
+      return contextCache[key].id;
+    }
+    
+    // Create new context
+    // NOTE: We can't easily batch this because we need the ID immediately for the cache.
+    // Since contexts are few, we can create them one by one.
+    try {
+      const newContext = ContextService.createContext({ name: contextName, icon: '🏷️' });
+      contextCache[key] = newContext;
+      results.contextsCreated++;
+      return newContext.id;
+    } catch (e) {
+      return '';
+    }
+  },
+
+  /**
+   * Parse MLO date format (2023-10-27T10:00:00)
+   */
+  parseMloDate: function(dateStr) {
+    if (!dateStr) return '';
+    // MLO: 2023-10-27T10:00:00
+    // Google: yyyy-MM-dd
+    try {
+      return dateStr.split('T')[0];
+    } catch (e) {
+      return '';
+    }
+  },
+  
+  /**
+   * Sanitize XML string
+   */
+  sanitizeXml: function(xml) {
+    if (!xml) return '';
+    // Remove potential BOM
+    xml = xml.replace(/^\uFEFF/, '');
+    // Remove control characters 0-31 except 9 (tab), 10 (LF), 13 (CR)
+    // Also remove 127 (DEL)
+    return xml.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
   }
 };
