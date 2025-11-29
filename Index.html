@@ -724,6 +724,62 @@
                 max-height: 100vh;
             }
         }
+
+        .custom-select-container {
+            position: relative;
+        }
+
+        .custom-select-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .dropdown-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            color: var(--text-primary);
+        }
+
+        .dropdown-item:hover {
+            background-color: var(--bg-secondary);
+        }
+
+        .dropdown-item.level-0 {
+            padding-left: 12px;
+        }
+
+        .dropdown-item.level-1 {
+            padding-left: 24px;
+        }
+
+        .dropdown-item.level-2 {
+            padding-left: 36px;
+        }
+
+        .dropdown-item.level-3 {
+            padding-left: 48px;
+        }
+
+        .dropdown-item.level-4 {
+            padding-left: 60px;
+        }
+
+        .dropdown-item .project-icon {
+            margin-right: 8px;
+            font-size: 16px;
+            color: var(--text-secondary);
+        }
     </style>
 </head>
 
@@ -841,10 +897,15 @@
                                 <option value="reference">Reference</option>
                             </select>
                         </div>
-                        <div class="form-group"><label for="taskProject">Project</label><select id="taskProject"
-                                class="form-control">
-                                <option value="">No Project</option>
-                            </select></div>
+                        <div class="form-group"><label for="taskProject">Project</label>
+                            <div class="custom-select-container" id="taskProjectContainer">
+                                <input type="text" id="taskProjectDisplay" class="form-control"
+                                    placeholder="Select Project..." autocomplete="off">
+                                <input type="hidden" id="taskProject">
+                                <div class="custom-select-dropdown" id="taskProjectDropdown" style="display: none;">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group"><label for="taskContext">Context</label><select id="taskContext"
@@ -948,7 +1009,11 @@
     </div>
     <script>
         var state = { tasks: [], projects: [], contexts: [], areas: [], settings: {}, currentPage: 'inbox', currentTask: null, currentProject: null };
-        function init(p) { state.currentPage = p || 'inbox'; loadAllData(); }
+        function init(p) {
+            state.currentPage = p || 'inbox';
+            setupProjectDropdown();
+            loadAllData();
+        }
         function loadAllData() { showLoading(true); google.script.run.withSuccessHandler(onDataLoaded).withFailureHandler(onDataError).getAllData(); }
         function onDataLoaded(d) {
             if (!d) { showToast('No data'); showLoading(false); return; } state.tasks = d.tasks || []; state.projects = d.projects || []; state.contexts = d.contexts || []; state.areas = d.areas || []; state.settings = d.settings || {};
@@ -1310,6 +1375,135 @@
                 showToast('Error: ' + e);
             }).quickCapture(t, '');
         }
+        // Custom Project Dropdown Logic
+        function setupProjectDropdown() {
+            const container = document.getElementById('taskProjectContainer');
+            const display = document.getElementById('taskProjectDisplay');
+            const hidden = document.getElementById('taskProject');
+            const dropdown = document.getElementById('taskProjectDropdown');
+
+            display.addEventListener('focus', () => {
+                renderProjectDropdown(state.projects, display.value);
+                dropdown.style.display = 'block';
+            });
+
+            display.addEventListener('input', () => {
+                renderProjectDropdown(state.projects, display.value);
+                dropdown.style.display = 'block';
+            });
+
+            // Close when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!container.contains(e.target)) {
+                    dropdown.style.display = 'none';
+                    // Reset display if invalid? No, let's keep it or reset to hidden value
+                    // For now, if hidden has value, reset display to that project name
+                    const currentId = hidden.value;
+                    if (currentId) {
+                        const p = state.projects.find(x => x.id === currentId);
+                        if (p) display.value = p.name;
+                    } else {
+                        display.value = '';
+                    }
+                }
+            });
+        }
+
+        function renderProjectDropdown(projects, searchTerm) {
+            const dropdown = document.getElementById('taskProjectDropdown');
+            dropdown.innerHTML = '';
+
+            // 1. Build Tree
+            const tree = buildProjectTree(projects);
+
+            // 2. Filter Tree (if search)
+            const filteredTree = searchTerm ? filterTree(tree, searchTerm.toLowerCase()) : tree;
+
+            // 3. Flatten for display
+            const flatList = flattenTree(filteredTree);
+
+            // 4. Render
+            // Add "No Project" option
+            const noProjectDiv = document.createElement('div');
+            noProjectDiv.className = 'dropdown-item';
+            noProjectDiv.textContent = 'No Project';
+            noProjectDiv.onclick = () => selectProject('', '');
+            dropdown.appendChild(noProjectDiv);
+
+            if (flatList.length === 0 && searchTerm) {
+                const empty = document.createElement('div');
+                empty.className = 'dropdown-item';
+                empty.style.color = 'var(--text-secondary)';
+                empty.textContent = 'No matches found';
+                dropdown.appendChild(empty);
+                return;
+            }
+
+            flatList.forEach(item => {
+                const div = document.createElement('div');
+                div.className = `dropdown-item level-${Math.min(item.level, 4)}`;
+                div.innerHTML = `<span class="material-icons project-icon">folder</span>${item.project.name}`;
+                div.onclick = () => selectProject(item.project.id, item.project.name);
+                dropdown.appendChild(div);
+            });
+        }
+
+        function selectProject(id, name) {
+            document.getElementById('taskProject').value = id;
+            document.getElementById('taskProjectDisplay').value = name;
+            document.getElementById('taskProjectDropdown').style.display = 'none';
+        }
+
+        // Helper: Build Tree
+        function buildProjectTree(projects) {
+            const map = {};
+            const roots = [];
+
+            // Initialize map
+            projects.forEach(p => {
+                map[p.id] = { project: p, children: [] };
+            });
+
+            // Link children
+            projects.forEach(p => {
+                if (p.parentProjectId && map[p.parentProjectId]) {
+                    map[p.parentProjectId].children.push(map[p.id]);
+                } else {
+                    roots.push(map[p.id]);
+                }
+            });
+
+            return roots; // Returns array of { project, children: [] }
+        }
+
+        // Helper: Filter Tree (Keep node if it matches OR if any descendant matches)
+        // Actually, for context, we want to show ancestors too?
+        // Let's keep it simple: If node matches, show it. If child matches, show parent too.
+        function filterTree(nodes, term) {
+            return nodes.reduce((acc, node) => {
+                const matches = node.project.name.toLowerCase().includes(term);
+                const filteredChildren = filterTree(node.children, term);
+
+                if (matches || filteredChildren.length > 0) {
+                    acc.push({
+                        project: node.project,
+                        children: filteredChildren
+                    });
+                }
+                return acc;
+            }, []);
+        }
+
+        // Helper: Flatten Tree for rendering
+        function flattenTree(nodes, level = 0) {
+            let result = [];
+            nodes.forEach(node => {
+                result.push({ project: node.project, level: level });
+                result = result.concat(flattenTree(node.children, level + 1));
+            });
+            return result;
+        }
+
         function openTaskDialog(id) {
             var t = state.tasks.find(function (x) { return x.id === id; });
             if (!t) return;
@@ -1318,7 +1512,13 @@
             document.getElementById('taskTitle').value = t.title;
             document.getElementById('taskNotes').value = t.notes || '';
             document.getElementById('taskStatus').value = t.status;
-            document.getElementById('taskProject').value = t.projectId || '';
+
+            // Setup Project Selector
+            const pId = t.projectId || '';
+            const pName = pId ? (state.projects.find(p => p.id === pId)?.name || '') : '';
+            document.getElementById('taskProject').value = pId;
+            document.getElementById('taskProjectDisplay').value = pName;
+
             document.getElementById('taskContext').value = t.contextId || '';
             document.getElementById('taskEnergy').value = t.energyRequired || 'medium';
             document.getElementById('taskDueDate').value = t.dueDate || '';
