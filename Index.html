@@ -1565,6 +1565,54 @@
                 loadAllData(); // Revert on error
             }).convertTaskToProject(taskId);
         }
+
+        function saveTask() {
+            if (!state.currentTask) return;
+            var d = {
+                title: document.getElementById('taskTitle').value,
+                notes: document.getElementById('taskNotes').value,
+                status: document.getElementById('taskStatus').value,
+                projectId: document.getElementById('taskProject').value,
+                contextId: document.getElementById('taskContext').value,
+                energyRequired: document.getElementById('taskEnergy').value,
+                dueDate: document.getElementById('taskDueDate').value,
+                scheduledDate: document.getElementById('taskScheduledDate').value,
+                timeEstimate: document.getElementById('taskTimeEstimate').value,
+                waitingFor: document.getElementById('taskWaitingFor').value
+            };
+
+            // If a project is selected, clear the parent task ID to move it to the project root
+            if (d.projectId) {
+                d.parentTaskId = '';
+            }
+
+            var id = state.currentTask.id;
+            // Optimistic update
+            var t = state.tasks.find(function (x) { return x.id === id; });
+            if (t) {
+                Object.assign(t, d);
+                renderPage(state.currentPage);
+                updateInboxBadge();
+            }
+            closeTaskDialog();
+            showToast('Saving...');
+
+            google.script.run.withSuccessHandler(function (r) {
+                if (r.success) {
+                    // Update with server response (e.g. modified date)
+                    var idx = state.tasks.findIndex(function (x) { return x.id === id; });
+                    if (idx !== -1) state.tasks[idx] = r.task;
+                    renderPage(state.currentPage);
+                    showToast('Saved');
+                } else {
+                    showToast('Error: ' + (r.error || 'Unknown error'));
+                    // Revert? For now just show error.
+                }
+            }).withFailureHandler(function (e) {
+                showToast('Error: ' + e);
+            }).updateTask(id, d);
+        }
+
         function closeTaskDialog() {
             document.getElementById('taskDialog').style.display = 'none';
             state.currentTask = null;
