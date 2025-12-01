@@ -3,64 +3,74 @@
 A personal productivity application based on the Getting Things Done (GTD) methodology, built with Google Apps Script and HTML/CSS/JS.
 
 ## Features
+
+### Core GTD
 - **Inbox Processing**: Quickly capture and process tasks.
-- **Project Management**: Organize tasks into projects and areas.
+- **Project Management**: Organize tasks into projects and areas with support for sub-projects.
 - **Contexts**: Filter tasks by context (e.g., @home, @work).
 - **Weekly Review**: Dedicated workflow for reviewing your system.
+- **Next Actions Badge**: Visual indicator for tasks due today or overdue.
+
+### AI & Automation
+- **AI Email Scanner**: Uses Google Gemini to scan your Gmail Inbox for actionable items.
+    - Auto-discovers the best available model (e.g., Gemini 2.0 Flash).
+    - Filters out newsletters, receipts, and generic notifications (like LinkedIn).
+    - Labels actionable emails as `GTD/Suggested`.
+- **Gmail Import**: Import emails labeled `GTD/ToProcess` directly as tasks.
+
+### Advanced
 - **Search**: Hierarchical search for tasks and projects.
-- **Export**: Download your completed task history.
+- **Export**: Download your completed task history to CSV.
+- **MLO Import**: Python script (`compact_mlo.py`) to migrate from MyLifeOrganized.
+- **Database Compaction**: Clean up deleted items to keep the app fast.
 
 ## Prerequisites
 - A Google Account.
 - Access to Google Drive and Google Sheets.
+- (Optional) A Google Cloud Project with **Gemini API** enabled for AI features.
 
 ## Installation
 
 1.  **Create a Project**:
     - Go to [script.google.com](https://script.google.com).
     - Click **New Project**.
-    - Name it "GTD App" (or whatever you prefer).
+    - Name it "GTD App".
 
 2.  **Copy Files**:
     - Copy the contents of the `.gs` and `.html` files from this repository into your new Apps Script project.
-    - Ensure filenames match (e.g., `Code.gs`, `Index.html`).
+    - **Important**: Update `appsscript.json` (Project Settings > Show manifest) with the provided manifest file to enable necessary permissions.
 
 ## Setup
 
-1.  **Create the Database**:
-    - Create a new Google Sheet in your Google Drive.
-    - Name it "GTD Database" (or similar).
-    - **Note**: You do not need to create any sheets or columns manually. The app will do this for you automatically on the first run.
+### 1. Database Setup
+- Create a new Google Sheet named "GTD Database".
+- Copy the **Spreadsheet ID** from the URL.
+- In Apps Script, go to **Project Settings** > **Script Properties**.
+- Add Property: `SHEET_ID` = `your_spreadsheet_id`
 
-2.  **Link the Spreadsheet**:
-    - Copy the **Spreadsheet ID** from the URL of your Google Sheet.
-      - URL format: `https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit...`
-    - In your Apps Script project, open `Config.gs`.
-    - Find the `setSpreadsheetId` function.
-    - Run this function once with your ID, OR manually set a **Script Property**:
-      - Go to **Project Settings** (gear icon).
-      - Scroll to **Script Properties**.
-      - Add a property:
-        - **Property**: `SHEET_ID`
-        - **Value**: `your_spreadsheet_id_here`
+### 2. AI Configuration (Optional)
+To enable the AI Email Scanner:
+- Get a [Gemini API Key](https://aistudio.google.com/app/apikey).
+- In **Script Properties**, add: `GEMINI_API_KEY` = `your_api_key`
+- (Optional) Add `USER_EMAIL` property if you want the AI to be specific about your identity.
 
-3.  **Initialize**:
-    - The first time you load the web app, it will detect that the sheets are missing and automatically create them (`Tasks`, `Projects`, `Contexts`, `Areas`, `Settings`) with the correct columns and some default data.
-
-## Deployment
-
-1.  Click **Deploy** > **New deployment**.
-2.  Select type: **Web app**.
-3.  **Description**: "Initial deploy".
-4.  **Execute as**: `Me` (your email).
-5.  **Who has access**: `Only myself` (recommended for personal use).
-6.  Click **Deploy**.
-7.  Copy the **Web App URL**.
+### 3. Initialize
+- The first time you load the web app, it will automatically create the necessary sheets (`Tasks`, `Projects`, etc.).
 
 ## Usage
 
-- Open the Web App URL in your browser (desktop or mobile).
-- Add the page to your home screen for an app-like experience.
-- **Quick Capture**: Use the input at the bottom (mobile) or top (desktop) to add tasks to your Inbox.
-- **Process**: Go to Inbox to clarify and organize tasks.
-- **Review**: Use the Weekly Review page to keep your system current.
+### Web App
+- **Deploy**: Click **Deploy** > **New deployment** > **Web app**.
+- **Access**: Open the provided URL on desktop or mobile.
+- **Add to Home Screen**: On mobile, use "Add to Home Screen" for an app-like experience.
+
+### AI Scanner
+- **Manual**: Click the "Scan Inbox (AI)" button in the Inbox view.
+- **Automatic**: Set up a Time-driven trigger in Apps Script to run `scanInboxForSuggestions` every 15-30 minutes.
+
+### Gmail Import
+- Label emails in Gmail with `GTD/ToProcess`.
+- Click "Import (GTD/ToProcess)" in the Inbox view to convert them to tasks.
+
+## Deployment Notes
+- If you see "Code Updated!" alerts, ensure you are using the **Test Deployment** URL (`/dev`) for development or redeploying a new version for the **Published URL** (`/exec`).
