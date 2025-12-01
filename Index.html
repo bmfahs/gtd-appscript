@@ -1129,7 +1129,10 @@
             var t = getInboxTasks();
             var h = '<div class="page-header"><h2>Inbox</h2><p>Capture everything, process later</p></div>';
             // Add Import Button
-            h += '<div style="margin-bottom: 16px;"><button class="btn btn-secondary" onclick="importGmail()"><span class="material-icons">download</span> Import from Gmail (GTD/ToProcess)</button></div>';
+            h += '<div style="margin-bottom: 16px;">' +
+                '<button class="btn btn-secondary" onclick="importGmail()" style="margin-right: 8px;"><span class="material-icons">download</span> Import (GTD/ToProcess)</button>' +
+                '<button class="btn btn-secondary" onclick="scanInbox()"><span class="material-icons">psychology</span> Scan Inbox (AI)</button>' +
+                '</div>';
 
             if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">inbox</span><h3>Inbox Zero!</h3><p>Everything processed.</p></div>';
             else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; }
@@ -1824,17 +1827,46 @@
         }
 
         function importGmail() {
-            showToast('Importing emails...');
+            showLoading(true);
             google.script.run.withSuccessHandler(function (r) {
+                showLoading(false);
                 if (r.success) {
-                    showToast('Imported ' + r.count + ' tasks.');
+                    showToast('Imported ' + r.count + ' tasks');
                     loadAllData();
                 } else {
-                    showToast('Error: ' + (r.error || 'Unknown error'));
+                    showToast('Error: ' + r.error);
                 }
-            }).withFailureHandler(function (e) {
-                showToast('Error: ' + e);
-            }).importGmailTasks();
+            }).withFailureHandler(function (e) { showToast('Error: ' + e); showLoading(false); }).importGmailTasks();
+        }
+
+        function scanInbox() {
+            var totalProcessed = 0;
+            var isScanning = true;
+
+            function runBatch() {
+                if (!isScanning) return;
+                showLoading(true);
+                showToast('Scanning... (Processed: ' + totalProcessed + ')');
+
+                google.script.run.withSuccessHandler(function (r) {
+                    totalProcessed += r.count;
+
+                    if (r.complete) {
+                        showLoading(false);
+                        showToast('Scan Complete. Total Processed: ' + totalProcessed);
+                        isScanning = false;
+                    } else {
+                        // Continue scanning
+                        runBatch();
+                    }
+                }).withFailureHandler(function (e) {
+                    showToast('Error: ' + e);
+                    showLoading(false);
+                    isScanning = false;
+                }).scanInboxForSuggestions();
+            }
+
+            runBatch();
         }
 
         function completeTaskClick(id) {

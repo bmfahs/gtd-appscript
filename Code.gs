@@ -554,3 +554,18 @@ function compactDatabase() {
 function importGmailTasks() {
   return GmailService.importToProcessEmails();
 }
+
+/**
+ * Scan Inbox for AI suggestions
+ * Can be run manually or via time-based trigger
+ */
+function scanInboxForSuggestions() {
+  return GmailService.scanInboxForSuggestions();
+}
+
+/**
+ * Debug: List available Gemini models
+ */
+function listGeminiModels() {
+  return AIService.listAvailableModels();
+}

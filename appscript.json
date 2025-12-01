@@ -12,9 +12,13 @@
         "https://www.googleapis.com/auth/gmail.addons.execute",
         "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
         "https://www.googleapis.com/auth/gmail.modify",
-        "https://www.googleapis.com/auth/gmail.labels"
+        "https://www.googleapis.com/auth/gmail.labels",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/script.external_request"
     ],
-    "urlFetchWhitelist": [],
+    "urlFetchWhitelist": [
+        "https://generativelanguage.googleapis.com/"
+    ],
     "addOns": {
         "common": {
             "name": "GTD System",

@@ -195,6 +195,75 @@ ${truncatedBody}${body && body.length > 500 ? '...' : ''}`;
     });
     
     return results;
+  },
+  
+  /**
+   * Scan Inbox for emails requiring action using AI
+   * Uses checkpointing to resume if stopped
+   */
+  scanInboxForSuggestions: function() {
+    const startTime = new Date().getTime();
+    const TIME_LIMIT = 5 * 60 * 1000; // 5 minutes
+    
+    const scannedLabel = this.getOrCreateLabel('GTD/Scanned');
+    const suggestedLabel = this.getOrCreateLabel('GTD/Suggested');
+    
+    // Search for unscanned inbox threads
+    // Note: Gmail search is not real-time, so we might see recently labeled threads
+    const query = 'label:inbox -label:GTD/Scanned -label:GTD/Suggested';
+    const threads = GmailApp.search(query, 0, 20); // Process in batches of 20
+    
+    console.log(`Found ${threads.length} threads to scan`);
+    
+    if (threads.length === 0) {
+      return { complete: true, count: 0 };
+    }
+    
+    const userEmail = Session.getActiveUser().getEmail() || 
+                      PropertiesService.getScriptProperties().getProperty('USER_EMAIL') || 
+                      'user';
+    
+    let processedCount = 0;
+    
+    for (const thread of threads) {
+      // Check time limit
+      if (new Date().getTime() - startTime > TIME_LIMIT) {
+        console.log('Time limit reached, stopping.');
+        return { complete: false, count: processedCount };
+      }
+      
+      const messages = thread.getMessages();
+      const lastMessage = messages[messages.length - 1]; // Analyze latest message
+      
+      // Skip if sent by user
+      if (lastMessage.getFrom().includes(userEmail)) {
+        thread.addLabel(scannedLabel);
+        processedCount++;
+        continue;
+      }
+      
+      const analysis = AIService.analyzeEmail(
+        lastMessage.getSubject(),
+        lastMessage.getPlainBody(),
+        lastMessage.getFrom(),
+        userEmail
+      );
+      
+      if (analysis.success) {
+        if (analysis.requiresAction) {
+          console.log(`Suggested: ${lastMessage.getSubject()} (${analysis.reason})`);
+          thread.addLabel(suggestedLabel);
+        }
+        
+        // Only mark as scanned if analysis was successful
+        thread.addLabel(scannedLabel);
+        processedCount++;
+      } else {
+        console.log(`Skipping label for ${lastMessage.getSubject()} due to analysis failure.`);
+      }
+    }
+    
+    return { complete: threads.length < 20, count: processedCount };
   }
 };
 
