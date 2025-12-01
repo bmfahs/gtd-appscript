@@ -97,6 +97,56 @@ ${truncatedBody}${body && body.length > 500 ? '...' : ''}`;
   },
   
   /**
+   * Import emails labeled 'GTD/ToProcess'
+   */
+  importToProcessEmails: function() {
+    const labelName = 'GTD/ToProcess';
+    const addedLabelName = 'GTD/Added';
+    
+    const label = GmailApp.getUserLabelByName(labelName);
+    if (!label) {
+      return { success: false, error: `Label '${labelName}' not found.` };
+    }
+    
+    const threads = label.getThreads(0, 50); // Limit to 50 to avoid timeout
+    if (threads.length === 0) {
+      return { success: true, count: 0 };
+    }
+    
+    const addedLabel = this.getOrCreateLabel(addedLabelName);
+    let count = 0;
+    
+    // Find <Inbox> task ID
+    const allTasks = TaskService.getAllTasks();
+    const inboxTask = allTasks.find(t => t.title === '<Inbox>');
+    const inboxId = inboxTask ? inboxTask.id : '';
+    
+    threads.forEach(thread => {
+      const message = thread.getMessages()[0]; // Use first message for details
+      const subject = thread.getFirstMessageSubject();
+      const permalink = thread.getPermalink();
+      
+      // Create Task
+      TaskService.createTask({
+        title: subject || '(No Subject)',
+        notes: `[Open in Gmail](${permalink})\n\n` + message.getPlainBody().substring(0, 200) + '...',
+        status: STATUS.INBOX,
+        emailId: message.getId(),
+        emailThreadId: thread.getId(),
+        parentTaskId: inboxId // Nest under <Inbox> if it exists
+      });
+      
+      count++;
+    });
+
+    // Batch Label Operations
+    addedLabel.addToThreads(threads);
+    label.removeFromThreads(threads);
+    
+    return { success: true, count: count };
+  },
+
+  /**
    * Get the current email in Gmail add-on context
    */
   getCurrentEmail: function(e) {

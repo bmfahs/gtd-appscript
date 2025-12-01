@@ -490,7 +490,6 @@ function exportCompletedItems() {
     var notes = (t.notes || '').replace(/"/g, '""');
     csv += '"Task","' + title + '","' + date + '","' + notes + '"\n';
   });
-  
   return csv;
 }
 
@@ -543,8 +542,15 @@ function compactDatabase() {
   
   if (result.projectsRemoved > 0) {
     projectSheet.clear();
-    projectSheet.getRange(1, 1, projectsToKeep.length, projectsToKeep[0].length).setValues(projectsToKeep);
+    projectSheet.getRange(2, 1, projectsToKeep.length - 1, projectsToKeep[0].length).setValues(projectsToKeep.slice(1));
   }
   
   return result;
+}
+
+/**
+ * Import emails from Gmail
+ */
+function importGmailTasks() {
+  return GmailService.importToProcessEmails();
 }
