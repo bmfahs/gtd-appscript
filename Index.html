@@ -779,7 +779,6 @@
             margin-right: 8px;
             font-size: 16px;
             color: var(--text-secondary);
-        }
     </style>
 </head>
 
@@ -826,7 +825,8 @@
                 <div class="nav-section">
                     <div class="nav-section-title">Do</div>
                     <a href="#" class="nav-item" data-page="next" onclick="navigateTo('next'); return false;">
-                        <span class="material-icons">play_arrow</span><span>Next Actions</span>
+                        <span class="material-icons">play_arrow</span><span>Next Actions</span><span class="badge"
+                            id="nextActionsBadge"></span>
                     </a>
                     <a href="#" class="nav-item" data-page="today" onclick="navigateTo('today'); return false;">
                         <span class="material-icons">today</span><span>Today</span>
@@ -1021,7 +1021,11 @@
             var inboxTask = state.tasks.find(function (t) { return t.title === '<Inbox>' || t.title === 'Inbox'; });
             state.inboxId = inboxTask ? inboxTask.id : null;
 
-            populateSelects(); updateInboxBadge(); navigateTo(state.currentPage); showLoading(false);
+            // Update Badges
+            updateInboxBadge();
+            updateNextActionsBadge();
+
+            populateSelects(); navigateTo(state.currentPage); showLoading(false);
         }
         function onDataError(e) { showToast('Error: ' + e); showLoading(false); }
         function populateSelects() { var cc = document.getElementById('currentContext'); if (cc) { cc.innerHTML = '<option value="">All Contexts</option>'; state.contexts.forEach(function (c) { cc.innerHTML += '<option value="' + c.id + '">' + c.icon + ' ' + c.name + '</option>'; }); } var ce = document.getElementById('currentEnergy'); if (ce) ce.value = state.settings.currentEnergyLevel || 'medium'; var tp = document.getElementById('taskProject'); if (tp) { tp.innerHTML = '<option value="">No Project</option>'; state.projects.forEach(function (p) { if (p.status === 'active') tp.innerHTML += '<option value="' + p.id + '">' + esc(p.name) + '</option>'; }); } var tc = document.getElementById('taskContext'); if (tc) { tc.innerHTML = '<option value="">No Context</option>'; state.contexts.forEach(function (c) { tc.innerHTML += '<option value="' + c.id + '">' + c.icon + ' ' + c.name + '</option>'; }); } var pa = document.getElementById('projectArea'); if (pa) { pa.innerHTML = '<option value="">No Area</option>'; state.areas.forEach(function (a) { pa.innerHTML += '<option value="' + a.id + '">' + a.icon + ' ' + a.name + '</option>'; }); } }
@@ -1136,6 +1140,59 @@
             var c = getInboxTasks().length;
             var b = document.getElementById('inboxBadge');
             if (b) b.textContent = c > 0 ? c : '';
+        }
+
+        function updateNextActionsBadge() {
+            try {
+                const debugDiv = document.getElementById('debug-info');
+                if (debugDiv) debugDiv.textContent = 'Running updateNextActionsBadge...';
+
+                const now = new Date();
+                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+                const nextTasks = state.tasks.filter(t => t.status === 'next');
+
+                const count = nextTasks.filter(t => {
+                    if (!t.dueDate) return false;
+                    try {
+                        // Handle YYYY-MM-DD string
+                        if (typeof t.dueDate === 'string' && t.dueDate.includes('-')) {
+                            const parts = t.dueDate.split('-');
+                            const due = new Date(parts[0], parts[1] - 1, parts[2]);
+                            return due <= today;
+                        }
+                        // Handle other formats (fallback)
+                        const d = new Date(t.dueDate);
+                        if (!isNaN(d.getTime())) {
+                            d.setHours(0, 0, 0, 0);
+                            return d <= today;
+                        }
+                    } catch (e) {
+                        console.error('Date parse error', e);
+                    }
+                    return false;
+                }).length;
+
+                const b = document.getElementById('nextActionsBadge');
+                if (b) {
+                    b.textContent = count > 0 ? count : '';
+                }
+
+                // DEBUG: On-page display
+                if (debugDiv) {
+                    const firstTask = nextTasks.length > 0 ? nextTasks[0] : null;
+                    debugDiv.innerHTML = `<strong>Debug Info:</strong><br>` +
+                        `Badge Count: ${count}<br>` +
+                        `Total Tasks: ${state.tasks.length}<br>` +
+                        `Next Tasks: ${nextTasks.length}<br>` +
+                        `Due Tasks: ${state.tasks.filter(t => t.dueDate).length}<br>` +
+                        `First Next Task: ${firstTask ? JSON.stringify(firstTask) : 'None'}<br>` +
+                        `Today: ${today.toDateString()}`;
+                }
+            } catch (err) {
+                const debugDiv = document.getElementById('debug-info');
+                if (debugDiv) debugDiv.textContent = 'Error: ' + err.toString();
+            }
         }
 
         function renderAllTasks() {
@@ -1253,7 +1310,55 @@
             });
             return h;
         }
-        function renderNext() { var t = state.tasks.filter(function (x) { return x.status === 'next'; }); var h = '<div class="page-header"><h2>Next Actions</h2><p>Things ready to do now</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">check_circle</span><h3>No Next Actions</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
+
+        function calculateTaskScore(task) {
+            let score = 0;
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+            // 1. Due Date (Critical)
+            if (task.dueDate) {
+                // Parse "YYYY-MM-DD"
+                const parts = task.dueDate.split('-');
+                const due = new Date(parts[0], parts[1] - 1, parts[2]);
+                const diffTime = due - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                if (diffDays < 0) score += 1000; // Overdue
+                else if (diffDays === 0) score += 500; // Today
+                else if (diffDays <= 1) score += 200; // Tomorrow
+                else if (diffDays <= 7) score += 100; // This Week
+                else score += 10; // Future due date
+            }
+
+            // 2. Energy (Effort) - Prefer Low Energy (Quick Wins)
+            if (task.energyRequired === 'low') score += 20;
+            else if (task.energyRequired === 'medium') score += 10;
+
+            // 3. Time Estimate - Prefer Short Tasks
+            if (task.timeEstimate) {
+                const min = parseInt(task.timeEstimate) || 0;
+                if (min > 0 && min <= 15) score += 15;
+                else if (min <= 30) score += 10;
+                else if (min <= 60) score += 5;
+            }
+
+            return score;
+        }
+
+        function renderNext() {
+            var t = state.tasks.filter(function (x) { return x.status === 'next'; });
+
+            // Sort by Score Descending
+            t.sort(function (a, b) {
+                return calculateTaskScore(b) - calculateTaskScore(a);
+            });
+
+            var h = '<div class="page-header"><h2>Next Actions</h2><p>Things ready to do now</p></div>';
+            if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">check_circle</span><h3>No Next Actions</h3></div>';
+            else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; }
+            return h;
+        }
         function renderToday() { var td = new Date().toISOString().split('T')[0]; var t = state.tasks.filter(function (x) { return (x.dueDate === td || x.scheduledDate === td) && x.status !== 'done' && x.status !== 'deleted'; }); var h = '<div class="page-header"><h2>Today</h2><p>' + new Date().toLocaleDateString() + '</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">event_available</span><h3>Clear Day</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
         function renderScheduled() { var t = state.tasks.filter(function (x) { return x.status === 'scheduled'; }); var h = '<div class="page-header"><h2>Scheduled</h2><p>Tasks for specific dates</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">event</span><h3>Nothing Scheduled</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
         function renderWaiting() { var t = state.tasks.filter(function (x) { return x.status === 'waiting'; }); var h = '<div class="page-header"><h2>Waiting For</h2><p>Delegated items</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">hourglass_empty</span><h3>Not Waiting</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
@@ -1606,6 +1711,7 @@
                 Object.assign(t, d);
                 renderPage(state.currentPage);
                 updateInboxBadge();
+                updateNextActionsBadge();
             }
             closeTaskDialog();
             showToast('Saving...');
@@ -1739,6 +1845,7 @@
                 // Remove from view immediately
                 renderPage(state.currentPage);
                 updateInboxBadge();
+                updateNextActionsBadge();
             }
 
             google.script.run.withSuccessHandler(function (r) {
@@ -1942,11 +2049,17 @@
                 }).withFailureHandler(function (e) { showToast('Error: ' + e); }).updateProject(state.currentProject.id, d);
             } else {
                 google.script.run.withSuccessHandler(function (p) {
-                    state.projects.push(p);
-                    closeProjectDialog();
+                    state.projects.push(p); // Keep original logic for adding new project
+                    state.areas = r.areas || [];
+
+                    document.getElementById('debug-status').textContent = 'Data loaded. Updating badges...';
+
+                    updateInboxBadge();
+                    updateNextActionsBadge();
+
                     populateSelects();
                     renderPage(state.currentPage);
-                    showToast('Created');
+                    showLoading(false);
                 }).withFailureHandler(function (e) { showToast('Error: ' + e); }).createProject(d);
             }
         }
@@ -1959,6 +2072,9 @@
         function esc(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
         function addContext() { var n = prompt('Context name:'); if (!n) return; var i = prompt('Emoji:', '📋'); google.script.run.withSuccessHandler(function (c) { state.contexts.push(c); populateSelects(); renderPage('contexts'); showToast('Added'); }).withFailureHandler(function (e) { showToast('Error: ' + e); }).createContext({ name: n, icon: i || '📋' }); }
         function addArea() { var n = prompt('Area name:'); if (!n) return; var i = prompt('Emoji:', '📁'); google.script.run.withSuccessHandler(function (a) { state.areas.push(a); populateSelects(); renderPage('areas'); showToast('Added'); }).withFailureHandler(function (e) { showToast('Error: ' + e); }).createArea({ name: n, icon: i || '📁' }); }
+
+
+
         document.addEventListener('DOMContentLoaded', function () { init('inbox'); });
     </script>
 </body>
