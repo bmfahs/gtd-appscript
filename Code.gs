@@ -562,10 +562,3 @@ function importGmailTasks() {
 function scanInboxForSuggestions() {
   return GmailService.scanInboxForSuggestions();
 }
-
-/**
- * Debug: List available Gemini models
- */
-function listGeminiModels() {
-  return AIService.listAvailableModels();
-}
