@@ -779,6 +779,7 @@
             margin-right: 8px;
             font-size: 16px;
             color: var(--text-secondary);
+        }
     </style>
 </head>
 
@@ -2082,7 +2083,7 @@
             } else {
                 google.script.run.withSuccessHandler(function (p) {
                     state.projects.push(p); // Keep original logic for adding new project
-                    state.areas = r.areas || [];
+                    // state.areas = r.areas || []; // r is undefined here
 
                     document.getElementById('debug-status').textContent = 'Data loaded. Updating badges...';
 

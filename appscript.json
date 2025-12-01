@@ -1,5 +1,11 @@
 {
     "timeZone": "America/Chicago",
+    "oauthScopes": [
+        "https://www.googleapis.com/auth/gmail.modify",
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/script.external_request",
+        "https://www.googleapis.com/auth/userinfo.email"
+    ],
     "dependencies": {},
     "exceptionLogging": "STACKDRIVER",
     "runtimeVersion": "V8",

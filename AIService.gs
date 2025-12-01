@@ -37,6 +37,10 @@ const AIService = {
       2. Generic invitations (e.g., LinkedIn connection requests, friend requests).
       3. Newsletters, receipts, or automated system alerts.
       4. "Call to Action" marketing or engagement emails (e.g., "Check out your stats", "Complete your profile").
+      5. Group announcements or broad reminders (e.g., starts with "Hi folks", "Hi all", "Everyone", "Everybody") that are not directed specifically to the user.
+      6. Bounce-back emails or delivery failure notifications (e.g., "Address not found", "Undeliverable").
+      7. Informational emails (e.g., "FYI", "For your information", "Just sharing") that do not explicitly request an action or response.
+      8. Emails containing "unsubscribe", "manage preferences", or "view in browser" links, as these are likely newsletters or automated updates.
       
       CRITICAL: If the sender is a system/bot (like "notifications@linkedin.com") and not a specific person, default to false unless it is a critical security alert.
       
