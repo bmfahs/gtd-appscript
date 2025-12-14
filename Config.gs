@@ -52,7 +52,8 @@ const PROJECT_STATUS = {
 // Task Types
 const TASK_TYPE = {
   TASK: 'task',
-  PROJECT: 'project'
+  PROJECT: 'project',
+  FOLDER: 'folder'
 };
 
 // Column indices for Tasks sheet (0-based)

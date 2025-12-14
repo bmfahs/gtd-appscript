@@ -573,3 +573,24 @@ function importGmailTasks() {
 function scanInboxForSuggestions() {
   return GmailService.scanInboxForSuggestions();
 }
+
+/**
+ * Wrapper to create a task from client side
+ * needed because createTask is not exposed directly
+ */
+function createTaskWrapper(taskData) {
+  return TaskService.createTask({
+    title: taskData.title,
+    notes: taskData.notes,
+    status: taskData.status,
+    projectId: taskData.projectId,
+    contextId: taskData.contextId,
+    energyRequired: taskData.energyRequired,
+    timeEstimate: taskData.timeEstimate,
+    waitingFor: taskData.waitingFor,
+    dueDate: taskData.dueDate,
+    scheduledDate: taskData.scheduledDate,
+    parentTaskId: taskData.parentTaskId, // Allow creating subtasks if needed
+    type: taskData.type // Should always be 'task' here but good to pass
+  });
+}

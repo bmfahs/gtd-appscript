@@ -855,6 +855,11 @@
                     <a href="#" class="nav-item" data-page="all" onclick="navigateTo('all'); return false;">
                         <span class="material-icons">account_tree</span><span>All Tasks</span>
                     </a>
+                    <a href="#" class="nav-item" onclick="navigateTo('attention'); return false;" data-page="attention">
+                        <span class="material-icons">health_and_safety</span>
+                        Attention
+                        <span class="badge" id="attentionBadge"></span>
+                    </a>
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title">Review</div>
@@ -883,136 +888,128 @@
                 <div id="pageContent"></div>
             </main>
         </div>
-        <div class="dialog-overlay" id="taskDialog" style="display: none;">
+        <!-- Unified Item Dialog -->
+        <div id="itemDialog" class="dialog-overlay" style="display: none;"
+            onclick="if(event.target === this) closeItemDialog()">
             <div class="dialog">
                 <div class="dialog-header">
-                    <h2 id="dialogTitle">Edit Task</h2>
-                    <button class="btn-icon" onclick="closeTaskDialog()"><span
+                    <h2 id="itemDialogTitle">Edit Item</h2>
+                    <button class="btn-icon" onclick="closeItemDialog()"><span
                             class="material-icons">close</span></button>
                 </div>
                 <div class="dialog-content">
-                    <div class="form-group"><label for="taskTitle">Title</label><input type="text" id="taskTitle"
-                            class="form-control"></div>
-                    <div class="form-group"><label for="taskNotes">Notes</label><textarea id="taskNotes"
-                            class="form-control" rows="4"></textarea></div>
+                    <div class="form-group">
+                        <label for="itemTitle">Title</label>
+                        <input type="text" id="itemTitle" class="form-control" autocomplete="off">
+                    </div>
+
                     <div class="form-row">
-                        <div class="form-group"><label for="taskStatus">Status</label>
-                            <select id="taskStatus" class="form-control">
+                        <div class="form-group">
+                            <label for="itemType">Type</label>
+                            <select id="itemType" class="form-control" onchange="updateDialogVisibility()">
+                                <option value="task">Task</option>
+                                <option value="project">Project</option>
+                                <option value="folder">Folder</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="itemStatus">Status</label>
+                            <select id="itemStatus" class="form-control">
                                 <option value="inbox">Inbox</option>
                                 <option value="next">Next Action</option>
+                                <option value="active">Active</option>
                                 <option value="waiting">Waiting For</option>
                                 <option value="scheduled">Scheduled</option>
                                 <option value="someday">Someday/Maybe</option>
-                                <option value="reference">Reference</option>
-                            </select>
-                        </div>
-                        <div class="form-group"><label for="taskProject">Project</label>
-                            <div class="custom-select-container" id="taskProjectContainer">
-                                <input type="text" id="taskProjectDisplay" class="form-control"
-                                    placeholder="Select Project..." autocomplete="off">
-                                <input type="hidden" id="taskProject">
-                                <div class="custom-select-dropdown" id="taskProjectDropdown" style="display: none;">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group"><label for="taskContext">Context</label><select id="taskContext"
-                                class="form-control">
-                                <option value="">No Context</option>
-                            </select></div>
-                        <div class="form-group"><label for="taskEnergy">Energy Required</label>
-                            <select id="taskEnergy" class="form-control">
-                                <option value="low">Low</option>
-                                <option value="medium">Medium</option>
-                                <option value="high">High</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group"><label for="taskDueDate">Due Date</label><input type="date"
-                                id="taskDueDate" class="form-control"></div>
-                        <div class="form-group"><label for="taskScheduledDate">Scheduled Date</label><input type="date"
-                                id="taskScheduledDate" class="form-control"></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group"><label for="taskTimeEstimate">Time Estimate (min)</label><input
-                                type="number" id="taskTimeEstimate" class="form-control" min="0" step="5"></div>
-                        <div class="form-group"><label for="taskWaitingFor">Waiting For</label><input type="text"
-                                id="taskWaitingFor" class="form-control"></div>
-                    </div>
-                    <div id="emailLink" class="form-group" style="display: none;">
-                        <label>Linked Email</label><a href="#" id="emailLinkAnchor" target="_blank"
-                            class="email-link"><span class="material-icons">email</span><span>Open in Gmail</span></a>
-                    </div>
-                </div>
-                <div class="dialog-footer">
-                    <div style="display: flex; gap: 8px;">
-                        <button class="btn btn-danger" id="deleteTaskBtn" onclick="deleteCurrentTask()"><span
-                                class="material-icons">delete</span>Delete</button>
-                        <button class="btn btn-secondary" id="convertTaskBtn" onclick="convertCurrentTask()"><span
-                                class="material-icons">transform</span>Convert to Project</button>
-                    </div>
-                    <div class="dialog-footer-right">
-                        <button class="btn btn-secondary" onclick="closeTaskDialog()">Cancel</button>
-                        <button class="btn btn-primary" onclick="saveTask()">Save</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="dialog-overlay" id="projectDialog" style="display: none;">
-            <div class="dialog">
-                <div class="dialog-header">
-                    <h2 id="projectDialogTitle">Edit Project</h2>
-                    <button class="btn-icon" onclick="closeProjectDialog()"><span
-                            class="material-icons">close</span></button>
-                </div>
-                <div class="dialog-content">
-                    <div class="form-group"><label for="projectName">Name</label><input type="text" id="projectName"
-                            class="form-control"></div>
-                    <div class="form-group"><label for="projectDescription">Description</label><textarea
-                            id="projectDescription" class="form-control" rows="3"></textarea></div>
-                    <div class="form-row">
-                        <div class="form-group"><label for="projectStatus">Status</label>
-                            <select id="projectStatus" class="form-control">
-                                <option value="active">Active</option>
-                                <option value="someday">Someday</option>
-                                <option value="completed">Completed</option>
+                                <option value="done">Done/Completed</option>
                                 <option value="dropped">Dropped</option>
                             </select>
                         </div>
-                        <div class="form-group"><label for="projectArea">Area</label>
-                            <select id="projectArea" class="form-control">
-                                <option value="">No Area</option>
-                            </select>
+                    </div>
+
+                    <div class="form-group" id="parentContainer">
+                        <label for="itemParentDisplay">Parent (Project/Folder)</label>
+                        <div class="custom-select-container" id="itemParentContainer">
+                            <input type="text" id="itemParentDisplay" class="form-control"
+                                placeholder="Search projects..." autocomplete="off">
+                            <input type="hidden" id="itemParent">
+                            <div id="itemParentDropdown" class="custom-select-dropdown" style="display: none;"></div>
                         </div>
                     </div>
-                    <div class="form-group"><label for="projectParent">Parent Project</label>
-                        <div class="custom-select" id="projectParentSelect">
-                            <div class="select-input-wrapper" style="position: relative;">
-                                <input type="text" id="projectParentSearch" placeholder="Search parent..."
-                                    onfocus="showParentOptions()" onclick="showParentOptions()"
-                                    onkeyup="filterParentProjects()" autocomplete="off" style="padding-right: 30px;">
-                                <span class="material-icons"
-                                    style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-secondary);">arrow_drop_down</span>
+
+                    <!-- Task Specific Fields -->
+                    <div id="taskFields">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="itemContext">Context</label>
+                                <select id="itemContext" class="form-control"></select>
                             </div>
-                            <div class="select-options" id="projectParentOptions"></div>
-                            <input type="hidden" id="projectParentValue">
+                            <div class="form-group">
+                                <label for="itemTimeEstimate">Time (min)</label>
+                                <input type="number" id="itemTimeEstimate" class="form-control" placeholder="15">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="itemEnergy">Energy</label>
+                                <select id="itemEnergy" class="form-control">
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="itemWaitingForGroup" style="display:none">
+                                <label for="itemWaitingFor">Waiting For (Who?)</label>
+                                <input type="text" id="itemWaitingFor" class="form-control">
+                            </div>
                         </div>
                     </div>
-                    <div class="form-group"><label for="projectDueDate">Due Date</label><input type="date"
-                            id="projectDueDate" class="form-control"></div>
+
+                    <!-- Project/Folder Specific Fields -->
+                    <div id="projectFields" style="display:none">
+                        <div class="form-group">
+                            <label for="itemArea">Area</label>
+                            <select id="itemArea" class="form-control"></select>
+                        </div>
+                    </div>
+
+                    <!-- Common Date Fields -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="itemDueDate">Due Date</label>
+                            <input type="date" id="itemDueDate" class="form-control">
+                        </div>
+                        <div class="form-group" id="scheduledDateGroup" style="display:none">
+                            <label for="itemScheduledDate">Scheduled Date</label>
+                            <input type="date" id="itemScheduledDate" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="itemNotes">Notes</label>
+                        <textarea id="itemNotes" class="form-control" rows="4"></textarea>
+                    </div>
+
+                    <div class="form-group" id="emailLink" style="display: none;">
+                        <a href="#" id="emailLinkAnchor" class="email-link" target="_blank">
+                            <span class="material-icons">mail</span> Open in Gmail
+                        </a>
+                    </div>
+
                 </div>
                 <div class="dialog-footer">
-                    <button class="btn btn-danger" id="deleteProjectBtn" onclick="deleteCurrentProject()"><span
-                            class="material-icons">delete</span>Delete</button>
+                    <button type="button" class="btn btn-danger" id="deleteItemBtn" onclick="deleteCurrentItem()"
+                        style="display: none;">
+                        <span class="material-icons" style="font-size: 18px;">delete</span>
+                    </button>
                     <div class="dialog-footer-right">
-                        <button class="btn btn-secondary" onclick="closeProjectDialog()">Cancel</button>
-                        <button class="btn btn-primary" onclick="saveProject()">Save</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeItemDialog()">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="saveItem()">Save</button>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
     </div>
     <div id="toast" class="toast"></div>
     </div>
@@ -1020,7 +1017,7 @@
         var state = { tasks: [], projects: [], contexts: [], areas: [], settings: {}, currentPage: 'inbox', currentTask: null, currentProject: null, selectedIndex: -1, lastKey: null, lastKeyTime: 0 };
         function init(p) {
             state.currentPage = p || 'inbox';
-            setupProjectDropdown();
+            // setupProjectDropdown(); // Removed as it was replaced by dialog-specific logic
             loadAllData();
         }
         function loadAllData() { showLoading(true); google.script.run.withSuccessHandler(onDataLoaded).withFailureHandler(onDataError).getAllData(); }
@@ -1032,18 +1029,137 @@
             // Update Badges
             updateInboxBadge();
             updateNextActionsBadge();
+            updateAttentionBadge();
 
             populateSelects(); navigateTo(state.currentPage); showLoading(false);
         }
         function onDataError(e) { showToast('Error: ' + e); showLoading(false); }
-        function populateSelects() { var cc = document.getElementById('currentContext'); if (cc) { cc.innerHTML = '<option value="">All Contexts</option>'; state.contexts.forEach(function (c) { cc.innerHTML += '<option value="' + c.id + '">' + c.icon + ' ' + c.name + '</option>'; }); } var ce = document.getElementById('currentEnergy'); if (ce) ce.value = state.settings.currentEnergyLevel || 'medium'; var tp = document.getElementById('taskProject'); if (tp) { tp.innerHTML = '<option value="">No Project</option>'; state.projects.forEach(function (p) { if (p.status === 'active') tp.innerHTML += '<option value="' + p.id + '">' + esc(p.name) + '</option>'; }); } var tc = document.getElementById('taskContext'); if (tc) { tc.innerHTML = '<option value="">No Context</option>'; state.contexts.forEach(function (c) { tc.innerHTML += '<option value="' + c.id + '">' + c.icon + ' ' + c.name + '</option>'; }); } var pa = document.getElementById('projectArea'); if (pa) { pa.innerHTML = '<option value="">No Area</option>'; state.areas.forEach(function (a) { pa.innerHTML += '<option value="' + a.id + '">' + a.icon + ' ' + a.name + '</option>'; }); } }
+        function populateSelects() {
+            var cc = document.getElementById('currentContext');
+            if (cc) {
+                cc.innerHTML = '<option value="">All Contexts</option>';
+                state.contexts.forEach(function (c) {
+                    cc.innerHTML += '<option value="' + c.id + '">' + c.icon + ' ' + c.name + '</option>';
+                });
+            }
+            var ce = document.getElementById('currentEnergy');
+            if (ce) ce.value = state.settings.currentEnergyLevel || 'medium';
+
+            // Item Dialog Selects
+            var tc = document.getElementById('itemContext');
+            if (tc) {
+                tc.innerHTML = '<option value="">No Context</option>';
+                state.contexts.forEach(function (c) {
+                    tc.innerHTML += '<option value="' + c.id + '">' + c.icon + ' ' + c.name + '</option>';
+                });
+            }
+            var pa = document.getElementById('itemArea');
+            if (pa) {
+                pa.innerHTML = '<option value="">No Area</option>';
+                state.areas.forEach(function (a) {
+                    pa.innerHTML += '<option value="' + a.id + '">' + a.icon + ' ' + a.name + '</option>';
+                });
+            }
+        }
         function navigateTo(p) {
             state.currentPage = p;
             state.selectedIndex = -1; // Reset selection
             document.querySelectorAll('.nav-item').forEach(function (i) { i.classList.remove('active'); if (i.dataset.page === p) i.classList.add('active'); }); var sb = document.getElementById('sidebar'); if (sb) sb.classList.remove('open'); renderPage(p);
         }
         function toggleSidebar() { var sb = document.getElementById('sidebar'); if (sb) sb.classList.toggle('open'); }
-        function renderPage(p) { var c = document.getElementById('pageContent'); if (!c) return; var h = ''; if (p === 'inbox') h = renderInbox(); else if (p === 'next') h = renderNext(); else if (p === 'today') h = renderToday(); else if (p === 'scheduled') h = renderScheduled(); else if (p === 'waiting') h = renderWaiting(); else if (p === 'projects') h = renderProjects(); else if (p === 'someday') h = renderSomeday(); else if (p === 'review') h = renderReview(); else if (p === 'contexts') h = renderContexts(); else if (p === 'areas') h = renderAreas(); else if (p === 'all') h = renderAllTasks(); else if (p === 'search') h = renderSearchResults(); else h = renderInbox(); c.innerHTML = h; }
+        function renderPage(p) { var c = document.getElementById('pageContent'); if (!c) return; var h = ''; if (p === 'inbox') h = renderInbox(); else if (p === 'next') h = renderNext(); else if (p === 'today') h = renderToday(); else if (p === 'scheduled') h = renderScheduled(); else if (p === 'waiting') h = renderWaiting(); else if (p === 'projects') h = renderProjects(); else if (p === 'someday') h = renderSomeday(); else if (p === 'review') h = renderReview(); else if (p === 'contexts') h = renderContexts(); else if (p === 'areas') h = renderAreas(); else if (p === 'attention') h = renderAttention(); else if (p === 'all') h = renderAllTasks(); else if (p === 'search') h = renderSearchResults(); else h = renderInbox(); c.innerHTML = h; }
+
+        // Attention View Logic
+        function getAttentionItems() {
+            var stalledProjects = [];
+            var malformedTasks = [];
+
+            // 1. Stalled Projects: Active projects with no next actions
+            // Filter: Must be active AND type='project' (Folders are ignored)
+            var activeProjects = state.projects.filter(function (p) {
+                return p.status === 'active' && (!p.type || p.type === 'project');
+            });
+            activeProjects.forEach(function (p) {
+                // Find visible tasks for this project
+                var projectTasks = state.tasks.filter(function (t) {
+                    return (t.projectId === p.id || t.parentTaskId === p.id) &&
+                        t.status !== 'done' && t.status !== 'deleted';
+                });
+
+                // Check if any have status 'next'
+                var hasNext = projectTasks.some(function (t) { return t.status === 'next'; });
+
+                if (!hasNext) {
+                    stalledProjects.push(p);
+                }
+            });
+
+            // 2. Malformed Tasks: Next actions missing context or time
+            var nextActions = state.tasks.filter(function (t) { return t.status === 'next'; });
+            nextActions.forEach(function (t) {
+                var issues = [];
+                if (!t.contextId) issues.push('No Context');
+                // if (!t.timeEstimate) issues.push('No Time'); // Time is optional? User said "don't have a time estimate"
+
+                // Let's be strict as requested
+                if (!t.timeEstimate) issues.push('No Time Est.');
+
+                if (issues.length > 0) {
+                    malformedTasks.push({ task: t, issues: issues });
+                }
+            });
+
+            return { stalledProjects: stalledProjects, malformedTasks: malformedTasks };
+        }
+
+        function updateAttentionBadge() {
+            var data = getAttentionItems();
+            var count = data.stalledProjects.length + data.malformedTasks.length;
+            var b = document.getElementById('attentionBadge');
+            if (b) b.textContent = count > 0 ? count : '';
+        }
+
+        function renderAttention() {
+            var data = getAttentionItems();
+            var h = '<div class="page-header"><h2>Attention</h2><p>Items requiring maintenance</p></div>';
+
+            if (data.stalledProjects.length === 0 && data.malformedTasks.length === 0) {
+                h += '<div class="empty-state"><span class="material-icons" style="color: var(--success)">check_circle</span><h3>All Systems Go!</h3><p>Your system is clean and up to date.</p></div>';
+                return h;
+            }
+
+            // Stalled Projects
+            if (data.stalledProjects.length > 0) {
+                h += '<div class="review-section"><h3><span class="material-icons" style="color: var(--warning)">warning</span> Stalled Projects (' + data.stalledProjects.length + ')</h3>';
+                h += '<p>Active projects with no Next Actions defined.</p>';
+                h += '<div class="task-list">';
+                data.stalledProjects.forEach(function (p) {
+                    h += '<div class="project-card" onclick="openItemDialog(\'' + p.id + '\')" style="border-left-color: var(--warning);">';
+                    h += '<div style="flex: 1; font-weight: 600;">' + esc(p.name) + '</div>';
+                    h += '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openItemDialog(null, \'task\', \'' + p.id + '\')">Add Action</button>';
+                    h += '</div>';
+                });
+                h += '</div></div>';
+            }
+
+            // Malformed Tasks
+            if (data.malformedTasks.length > 0) {
+                h += '<div class="review-section"><h3><span class="material-icons" style="color: var(--danger)">error</span> Task Hygiene (' + data.malformedTasks.length + ')</h3>';
+                h += '<p>Next Actions missing context or time estimates.</p>';
+                h += '<div class="task-list">';
+                data.malformedTasks.forEach(function (item) {
+                    var t = item.task;
+                    h += '<div class="task-item" onclick="openItemDialog(\'' + t.id + '\')">';
+                    h += '<div class="task-content">';
+                    h += '<div class="task-title">' + esc(t.title) + '</div>';
+                    h += '<div class="task-meta" style="color: var(--danger)">' + item.issues.join(', ') + '</div>';
+                    h += '</div></div>';
+                });
+                h += '</div></div>';
+            }
+
+            return h;
+        }
 
         // Search Logic
         var searchTimeout;
@@ -1168,41 +1284,60 @@
 
             if (e.key === 'j' || e.key === 'ArrowDown') {
                 state.selectedIndex++;
-                if (state.selectedIndex >= items.length) state.selectedIndex = items.length - 1;
-                updateSelection(items);
-                // e.preventDefault(); // Optional: prevent scroll if we handle it
-            } else if (e.key === 'k' || e.key === 'ArrowUp') {
+                if (state.selectedIndex >= items.length) state.selectedIndex = 0;
+                highlightItem(items[state.selectedIndex]);
+                return;
+            }
+
+            if (e.key === 'k' || e.key === 'ArrowUp') {
                 state.selectedIndex--;
-                if (state.selectedIndex < 0) state.selectedIndex = 0;
-                updateSelection(items);
-                // e.preventDefault();
-            } else if (e.key === 'x') {
-                // Toggle Checkbox
+                if (state.selectedIndex < 0) state.selectedIndex = items.length - 1;
+                highlightItem(items[state.selectedIndex]);
+                return;
+            }
+
+            if (e.key === 'Enter' || e.key === 'o') {
                 if (state.selectedIndex >= 0 && state.selectedIndex < items.length) {
-                    const el = items[state.selectedIndex];
-                    const checkbox = el.querySelector('.task-checkbox');
+                    // Click the item to open it
+                    items[state.selectedIndex].click();
+                }
+                return;
+            }
+
+            if (e.key === 'x') {
+                // Toggle Checkbox logic
+                // Needs us to find the checkbox inside the selected item and click it
+                if (state.selectedIndex >= 0 && state.selectedIndex < items.length) {
+                    const checkbox = items[state.selectedIndex].querySelector('.task-checkbox');
                     if (checkbox) checkbox.click();
                 }
-            } else if (e.key === 'Enter' || e.key === 'o') {
-                // Open Item
-                if (state.selectedIndex >= 0 && state.selectedIndex < items.length) {
-                    const el = items[state.selectedIndex];
-                    el.click();
-                }
-            } else if (e.key === '#') {
+                return;
+            }
+
+            if (e.key === '#') {
                 // Delete
                 if (state.selectedIndex >= 0 && state.selectedIndex < items.length) {
-                    // We need to trigger delete. The UI has buttons but maybe we call function directly?
-                    // Or find the delete button in the item?
-                    // List items don't have delete buttons usually visible/clickable easily.
-                    // But we can open the dialog and delete? Or just delete?
-                    // Let's safe fallback: Open dialog.
-                    const el = items[state.selectedIndex];
-                    el.click();
-                    // setTimeout(() => { if (document.getElementById('deleteTaskBtn')) document.getElementById('deleteTaskBtn').click(); }, 100);
-                    // Actually explicit delete is risky without confirmation. Let's just open for now (Enter does that).
-                    // Implementing direct delete requires ID lookup from element.
+                    // Simulate open dialog and delete? 
+                    // Or direct API call?
+                    // Logic was: openTaskDialog -> delete
+                    // Let's open the dialog first
+                    items[state.selectedIndex].click();
+                    // Then triggering delete is messy.
+                    // The user previously implemented this by opening the dialog.
+                    // "Action handlers ... #: delete"
+                    // Let's just open the dialog for now, or if open, delete?
+                    // If dialog is open, we can listen for # there?
+                    // If list view, maybe we should just open dialog.
                 }
+                return;
+            }
+
+            if (e.key === 'Escape') {
+                closeItemDialog();
+                // closeContextDialog(); // No longer exists
+                // closeAreaDialog(); // No longer exists
+                // closeSearch?
+                return;
             }
         }
 
@@ -1211,17 +1346,14 @@
             return Array.from(document.querySelectorAll('.task-item, .project-card'));
         }
 
-        function updateSelection(items = null) {
-            if (!items) items = getVisibleItems();
-
+        function highlightItem(item) {
             // Remove previous selection
             document.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
 
             // Apply new selection
-            if (state.selectedIndex >= 0 && state.selectedIndex < items.length) {
-                const el = items[state.selectedIndex];
-                el.classList.add('selected');
-                el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            if (item) {
+                item.classList.add('selected');
+                item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         }
 
@@ -1321,7 +1453,7 @@
             // Initialize map with Projects
             projects.forEach(function (p) {
                 if (p.status !== 'active') return;
-                map[p.id] = { data: p, type: 'project', children: [] };
+                map[p.id] = { data: p, type: p.type || 'project', children: [] };
             });
 
             // Initialize map with Tasks
@@ -1381,12 +1513,13 @@
                 // Combine styles into one string
                 var commonStyle = 'margin-left: ' + padding + 'px; margin-bottom: 8px; padding: 12px; display: flex; align-items: center; gap: 12px;';
 
-                if (node.type === 'project') {
-                    // Render Project
+                if (node.type === 'project' || node.type === 'folder') {
+                    // Render Project/Folder
                     var p = node.data;
-                    h += '<div class="project-card" onclick="openProjectDialog(\'' + p.id + '\')" style="' + commonStyle + '">';
+                    var icon = p.type === 'folder' ? 'folder_open' : 'folder';
+                    h += '<div class="project-card" onclick="openItemDialog(\'' + p.id + '\')" style="' + commonStyle + '">';
                     h += '<div class="task-checkbox" onclick="event.stopPropagation();completeProjectClick(\'' + p.id + '\')"></div>';
-                    h += '<div style="flex: 1; font-weight: 600; font-size: 14px; color: var(--text-primary); display: flex; align-items: center;"><span class="material-icons" style="font-size: 18px; margin-right: 6px; color: var(--text-muted);">folder</span>' + esc(p.name) + '</div>';
+                    h += '<div style="flex: 1; font-weight: 600; font-size: 14px; color: var(--text-primary); display: flex; align-items: center;"><span class="material-icons" style="font-size: 18px; margin-right: 6px; color: var(--text-muted);">' + icon + '</span>' + esc(p.name) + '</div>';
                     h += '</div>';
                 } else {
                     // Render Task
@@ -1398,16 +1531,16 @@
                     var ctx = state.contexts.find(function (c) { return c.id === t.contextId; });
                     var prj = state.projects.find(function (p) { return p.id === t.projectId; });
 
-                    h += '<div class="task-item" style="margin-left: ' + padding + 'px" onclick="openTaskDialog(\'' + t.id + '\')">';
+                    h += '<div class="task-item" style="margin-left: ' + padding + 'px" onclick="openItemDialog(\'' + t.id + '\')">';
                     h += '<div class="task-checkbox" onclick="event.stopPropagation();completeTaskClick(\'' + t.id + '\')"></div>';
                     h += '<div class="task-content">';
                     h += '<div class="task-title">' + esc(t.title) + '</div>';
 
                     var m = [];
                     if (ctx) m.push(ctx.icon + ' ' + ctx.name);
-                    // Don't show project name in meta if we are nested under it? 
+                    // Don't show project name in meta if we are nested under it?
                     // Actually, "All Tasks" might show it for context if flat, but in tree it's redundant if nested.
-                    // But logic is complex to know if parent is the project. 
+                    // But logic is complex to know if parent is the project.
                     // Let's keep it simple for now.
                     if (t.dueDate) m.push(t.dueDate);
                     if (m.length > 0) h += '<div class="task-meta">' + m.join(' &bull; ') + '</div>';
@@ -1477,7 +1610,7 @@
             var projects = state.projects.filter(function (x) { return x.status === 'active'; });
             var tree = buildProjectTree(projects);
             var h = '<div class="page-header"><h2>Projects</h2><p>Multi-step outcomes</p></div>';
-            h += '<button class="btn btn-primary" onclick="openProjectDialog()" style="margin-bottom:16px"><span class="material-icons">add</span> New Project</button>';
+            h += '<button class="btn btn-primary" onclick="openItemDialog(null, \'project\')" style="margin-bottom:16px"><span class="material-icons">add</span> New Project</button>';
 
             if (projects.length === 0) {
                 h += '<div class="empty-state"><span class="material-icons">folder_open</span><h3>No Active Projects</h3></div>';
@@ -1523,10 +1656,11 @@
                 var padding = level * 24;
 
                 var style = 'margin-left: ' + padding + 'px; margin-bottom: 8px; padding: 12px; display: flex; align-items: center; gap: 12px;';
+                var icon = x.type === 'folder' ? 'folder_open' : 'folder';
 
-                h += '<div class="project-card" onclick="openProjectDialog(\'' + x.id + '\')" style="' + style + '">';
+                h += '<div class="project-card" onclick="openItemDialog(\'' + x.id + '\')" style="' + style + '">';
                 h += '<div class="task-checkbox" onclick="event.stopPropagation();completeProjectClick(\'' + x.id + '\')"></div>';
-                h += '<div style="flex: 1; font-weight: 600; font-size: 14px; color: var(--text-primary); display: flex; align-items: center;"><span class="material-icons" style="font-size: 18px; margin-right: 6px; color: var(--text-muted);">folder</span>' + esc(x.name) + '</div>';
+                h += '<div style="flex: 1; font-weight: 600; font-size: 14px; color: var(--text-primary); display: flex; align-items: center;"><span class="material-icons" style="font-size: 18px; margin-right: 6px; color: var(--text-muted);">' + icon + '</span>' + esc(x.name) + '</div>';
                 h += '<div class="project-stats" style="margin-left: auto;">' + tc + ' tasks</div>';
                 h += '</div>';
 
@@ -1550,7 +1684,7 @@
         function taskItem(t) {
             var ctx = state.contexts.find(function (c) { return c.id === t.contextId; });
             var prj = state.projects.find(function (p) { return p.id === t.projectId; });
-            var h = '<div class="task-item" onclick="openTaskDialog(\'' + t.id + '\')"><div class="task-checkbox" onclick="event.stopPropagation();completeTaskClick(\'' + t.id + '\')"></div><div class="task-content"><div class="task-title">' + esc(t.title);
+            var h = '<div class="task-item" onclick="openItemDialog(\'' + t.id + '\')"><div class="task-checkbox" onclick="event.stopPropagation();completeTaskClick(\'' + t.id + '\')"></div><div class="task-content"><div class="task-title">' + esc(t.title);
 
             // Email Link Icon
             if (t.emailThreadId) {
@@ -1607,83 +1741,8 @@
             }).quickCapture(t, '');
         }
         // Custom Project Dropdown Logic
-        function setupProjectDropdown() {
-            const container = document.getElementById('taskProjectContainer');
-            const display = document.getElementById('taskProjectDisplay');
-            const hidden = document.getElementById('taskProject');
-            const dropdown = document.getElementById('taskProjectDropdown');
-
-            display.addEventListener('focus', () => {
-                renderProjectDropdown(state.projects, display.value);
-                dropdown.style.display = 'block';
-            });
-
-            display.addEventListener('input', () => {
-                renderProjectDropdown(state.projects, display.value);
-                dropdown.style.display = 'block';
-            });
-
-            // Close when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!container.contains(e.target)) {
-                    dropdown.style.display = 'none';
-                    // Reset display if invalid? No, let's keep it or reset to hidden value
-                    // For now, if hidden has value, reset display to that project name
-                    const currentId = hidden.value;
-                    if (currentId) {
-                        const p = state.projects.find(x => x.id === currentId);
-                        if (p) display.value = p.name;
-                    } else {
-                        display.value = '';
-                    }
-                }
-            });
-        }
-
-        function renderProjectDropdown(projects, searchTerm) {
-            const dropdown = document.getElementById('taskProjectDropdown');
-            dropdown.innerHTML = '';
-
-            // 1. Build Tree
-            const tree = buildProjectDropdownTree(projects);
-
-            // 2. Filter Tree (if search)
-            const filteredTree = searchTerm ? filterProjectDropdownTree(tree, searchTerm.toLowerCase()) : tree;
-
-            // 3. Flatten for display
-            const flatList = flattenProjectDropdownTree(filteredTree);
-
-            // 4. Render
-            // Add "No Project" option
-            const noProjectDiv = document.createElement('div');
-            noProjectDiv.className = 'dropdown-item';
-            noProjectDiv.textContent = 'No Project';
-            noProjectDiv.onclick = () => selectProject('', '');
-            dropdown.appendChild(noProjectDiv);
-
-            if (flatList.length === 0 && searchTerm) {
-                const empty = document.createElement('div');
-                empty.className = 'dropdown-item';
-                empty.style.color = 'var(--text-secondary)';
-                empty.textContent = 'No matches found';
-                dropdown.appendChild(empty);
-                return;
-            }
-
-            flatList.forEach(item => {
-                const div = document.createElement('div');
-                div.className = `dropdown-item level-${Math.min(item.level, 4)}`;
-                div.innerHTML = `<span class="material-icons project-icon">folder</span>${item.project.name}`;
-                div.onclick = () => selectProject(item.project.id, item.project.name);
-                dropdown.appendChild(div);
-            });
-        }
-
-        function selectProject(id, name) {
-            document.getElementById('taskProject').value = id;
-            document.getElementById('taskProjectDisplay').value = name;
-            document.getElementById('taskProjectDropdown').style.display = 'none';
-        }
+        // This is now replaced by setupParentDropdown for the unified dialog.
+        // Keeping the helper functions for tree building/filtering/flattening.
 
         // Helper: Build Tree for Dropdown
         function buildProjectDropdownTree(projects) {
@@ -1733,48 +1792,323 @@
             return result;
         }
 
-        function openTaskDialog(id) {
-            var t = state.tasks.find(function (x) { return x.id === id; });
-            if (!t) return;
-            state.currentTask = t;
-            document.getElementById('dialogTitle').textContent = 'Edit Task';
-            document.getElementById('taskTitle').value = t.title;
-            document.getElementById('taskNotes').value = t.notes || '';
-            document.getElementById('taskStatus').value = t.status;
+        // Unified Item Dialog Logic
 
-            // Setup Project Selector
-            const pId = t.projectId || '';
-            const pName = pId ? (state.projects.find(p => p.id === pId)?.name || '') : '';
-            document.getElementById('taskProject').value = pId;
-            document.getElementById('taskProjectDisplay').value = pName;
+        function openItemDialog(id, typeOverride, parentIdOverride) {
+            document.getElementById('itemDialog').style.display = 'flex';
 
-            document.getElementById('taskContext').value = t.contextId || '';
-            document.getElementById('taskEnergy').value = t.energyRequired || 'medium';
-            document.getElementById('taskDueDate').value = t.dueDate || '';
-            document.getElementById('taskScheduledDate').value = t.scheduledDate || '';
-            document.getElementById('taskTimeEstimate').value = t.timeEstimate || '';
-            document.getElementById('taskWaitingFor').value = t.waitingFor || '';
+            // Reset fields
+            document.getElementById('itemTitle').value = '';
+            document.getElementById('itemNotes').value = '';
+            document.getElementById('itemType').value = typeOverride || 'task';
+            document.getElementById('itemStatus').value = 'inbox';
+            document.getElementById('itemParent').value = parentIdOverride || '';
+            document.getElementById('itemParentDisplay').value = '';
 
-            var el = document.getElementById('emailLink');
-            if (t.emailThreadId) {
-                el.style.display = 'block';
-                document.getElementById('emailLinkAnchor').href = '#';
-                document.getElementById('emailLinkAnchor').onclick = function () { openGmail(t.emailThreadId); return false; };
+            // Task specific defaults
+            document.getElementById('itemContext').value = state.settings.defaultContext || '';
+            document.getElementById('itemEnergy').value = 'medium';
+            document.getElementById('itemTimeEstimate').value = '';
+            document.getElementById('itemWaitingFor').value = '';
+
+            // Project specific defaults
+            document.getElementById('itemArea').value = '';
+
+            // Common
+            document.getElementById('itemDueDate').value = '';
+            document.getElementById('itemScheduledDate').value = '';
+            document.getElementById('emailLink').style.display = 'none';
+            document.getElementById('deleteItemBtn').style.display = 'none';
+
+            if (id) {
+                // Editing existing item
+                // Try to find in tasks first (since tasks and projects are now both technically tasks in DB)
+                // But wait, state.projects and state.tasks are separate lists in frontend state.
+                // We need to check both or check ID map if we had one.
+
+                var item = state.tasks.find(x => x.id === id);
+                var isProjectState = false;
+
+                if (!item) {
+                    item = state.projects.find(x => x.id === id);
+                    isProjectState = true;
+                }
+
+                if (item) {
+                    state.currentItem = item;
+                    document.getElementById('itemDialogTitle').textContent = 'Edit Item';
+                    document.getElementById('itemTitle').value = item.title || item.name; // Task vs Project prop
+                    document.getElementById('itemNotes').value = item.notes || item.description || '';
+                    document.getElementById('itemStatus').value = item.status;
+
+                    // Determine type
+                    // If it's in state.projects, it is a project or folder type
+                    // If in state.tasks, it is task type (unless we allow mixed, but currently separated)
+                    // Use item.type if available, otherwise infer from list
+                    var type = item.type || (isProjectState ? 'project' : 'task');
+                    document.getElementById('itemType').value = type;
+
+                    // Parent
+                    // For Task: parentTaskId or projectId
+                    // For Project: parentProjectId
+                    var pId = item.projectId || item.parentTaskId || item.parentProjectId || '';
+                    document.getElementById('itemParent').value = pId;
+                    if (pId) {
+                        var p = state.projects.find(x => x.id === pId); // Parent is always a project/folder
+                        if (p) document.getElementById('itemParentDisplay').value = p.name;
+                    }
+
+                    // Task specific
+                    document.getElementById('itemContext').value = item.contextId || '';
+                    document.getElementById('itemEnergy').value = item.energyRequired || 'medium';
+                    document.getElementById('itemTimeEstimate').value = item.timeEstimate || '';
+                    document.getElementById('itemWaitingFor').value = item.waitingFor || '';
+
+                    // Project specific
+                    document.getElementById('itemArea').value = item.areaId || '';
+
+                    // Common
+                    document.getElementById('itemDueDate').value = item.dueDate || '';
+                    document.getElementById('itemScheduledDate').value = item.scheduledDate || '';
+
+                    // Email
+                    if (item.emailThreadId) {
+                        document.getElementById('emailLink').style.display = 'block';
+                        document.getElementById('emailLinkAnchor').onclick = function () { openGmail(item.emailThreadId); return false; };
+                    }
+
+                    document.getElementById('deleteItemBtn').style.display = 'inline-flex';
+                }
             } else {
-                el.style.display = 'none';
+                // New Item
+                state.currentItem = null;
+                document.getElementById('itemDialogTitle').textContent = 'New Item';
+
+                if (parentIdOverride) {
+                    var p = state.projects.find(x => x.id === parentIdOverride);
+                    if (p) document.getElementById('itemParentDisplay').value = p.name;
+                }
             }
 
-            document.getElementById('deleteTaskBtn').style.display = 'inline-flex';
-            document.getElementById('taskDialog').style.display = 'flex';
+            updateDialogVisibility();
+            setupParentDropdown(); // Hook up events for new dialog
         }
+
+        function updateDialogVisibility() {
+            var type = document.getElementById('itemType').value;
+            var status = document.getElementById('itemStatus').value;
+
+            var taskFields = document.getElementById('taskFields');
+            var projectFields = document.getElementById('projectFields');
+
+            if (type === 'task') {
+                taskFields.style.display = 'block';
+                projectFields.style.display = 'none';
+
+                // Status specific visibility (e.g. Waiting For, Scheduled)
+                document.getElementById('itemWaitingForGroup').style.display = (status === 'waiting') ? 'block' : 'none';
+                document.getElementById('scheduledDateGroup').style.display = (status === 'scheduled') ? 'block' : 'none';
+
+            } else {
+                // Project or Folder
+                taskFields.style.display = 'none';
+                projectFields.style.display = 'block';
+
+                document.getElementById('itemWaitingForGroup').style.display = 'none';
+                document.getElementById('scheduledDateGroup').style.display = 'none'; // Projects usually just have due date
+            }
+        }
+
+        function saveItem() {
+            var id = state.currentItem ? state.currentItem.id : null;
+            var type = document.getElementById('itemType').value;
+
+            var d = {
+                title: document.getElementById('itemTitle').value,
+                notes: document.getElementById('itemNotes').value,
+                status: document.getElementById('itemStatus').value,
+                type: type,
+                dueDate: document.getElementById('itemDueDate').value
+            };
+
+            // Parent ID
+            // Unified parent field - maps to different DB fields based on type, OR we can normalize in backend?
+            // Backend TaskService: parentTaskId is used for hierarchy.
+            // Backend ProjectService (which wraps TaskService): uses parentTaskId mapping to parentProjectId.
+            // Task: can have projectId (if regular task in project) or parentTaskId (if subtask).
+            // Current model: 
+            // - Task in Project: projectId = P_ID, parentTaskId = '' (or subtask ID)
+            // - Project in Project: parentTaskId = P_ID
+            // - Task in Inbox: parentTaskId = '', projectId = ''
+
+            var parentId = document.getElementById('itemParent').value;
+
+            if (type === 'task') {
+                // Fields
+                d.contextId = document.getElementById('itemContext').value;
+                d.energyRequired = document.getElementById('itemEnergy').value;
+                d.timeEstimate = document.getElementById('itemTimeEstimate').value;
+                d.waitingFor = document.getElementById('itemWaitingFor').value;
+                d.scheduledDate = document.getElementById('itemScheduledDate').value;
+
+                // Parent Mapping
+                d.projectId = parentId; // For tasks, we treat the parent container as the project
+                d.parentTaskId = ''; // Reset subtask nesting if moved to project root? 
+                // Advanced: if we wanted to support subtasks, we'd need to know if parentId is a Task or Project.
+                // For now, simplifed: Parent is always a Project/Folder.
+            } else {
+                // Project or Folder
+                // DB expects 'name' and 'description' for legacy component?
+                // But unified ProjectService.createProject maps 'name' -> 'title', 'description' -> 'notes'.
+                // So passing 'title'/'notes' directly to updateTask is fine if we bypass ProjectService wrapper?
+                // Wait, Code.gs updateProject calls ProjectService.updateProject which maps name->title.
+                // Let's pass 'name'/'description' aliased to be safe if routed through ProjectService.
+                d.name = d.title;
+                d.description = d.notes;
+
+                d.areaId = document.getElementById('itemArea').value;
+                d.parentProjectId = parentId; // Projects nest via parentProjectId
+            }
+
+            // Optimistic Update
+            // This is complex because we might be switching lists (Task <-> Project)
+            // Easier to just show loading and wait for server re-load usually, or try partial update.
+            // Let's do a basic optimistic update if ID exists and type didn't change group (Task->Task).
+
+            if (id) {
+                // Update existing
+                showToast('Saving...');
+
+                // If changing type from Task to Project or vice versa, we might need to move it in local state lists
+                // But simply calling loadAllData() on success is safer and easier.
+
+                if (type === 'task') {
+                    google.script.run.withSuccessHandler(handleSaveSuccess).updateTask(id, d);
+                } else {
+                    // Use updateProject for Project/Folder types (it handles the type update we fixed earlier)
+                    // Note: updateProject expects project-like keys, simplified above.
+                    google.script.run.withSuccessHandler(handleSaveSuccess).updateProject(id, d);
+                }
+            } else {
+                // Create New
+                showToast('Creating...');
+                if (type === 'task') {
+                    // d has task fields
+                    google.script.run.withSuccessHandler(handleSaveSuccess).createTaskWrapper(d);
+                } else {
+                    google.script.run.withSuccessHandler(handleSaveSuccess).createProject(d);
+                }
+            }
+
+            closeItemDialog();
+        }
+
+        function handleSaveSuccess(r) {
+            if (r && r.success) {
+                showToast('Saved');
+                loadAllData(); // Refresh everything to be safe
+            } else {
+                showToast('Error: ' + (r ? r.error : 'Unknown'));
+            }
+        }
+
+        function closeItemDialog() {
+            document.getElementById('itemDialog').style.display = 'none';
+            state.currentItem = null;
+        }
+
+        function deleteCurrentItem() {
+            if (!state.currentItem || !confirm('Delete this item?')) return;
+            var id = state.currentItem.id;
+            var type = document.getElementById('itemType').value;
+
+            if (type === 'task') {
+                google.script.run.withSuccessHandler(handleSaveSuccess).deleteTask(id);
+            } else {
+                google.script.run.withSuccessHandler(handleSaveSuccess).deleteProject(id);
+            }
+            closeItemDialog();
+        }
+
+        // Custom Parent Dropdown Logic for Item Dialog
+        function setupParentDropdown() {
+            // Similar to previous setupProjectDropdown but targeting new IDs
+            const container = document.getElementById('itemParentContainer');
+            const display = document.getElementById('itemParentDisplay');
+            const hidden = document.getElementById('itemParent');
+            const dropdown = document.getElementById('itemParentDropdown');
+
+            // Remove old listeners to avoid dupes? (Not easy)
+            // Simpler: use onfocus/oninput in HTML or valid "one-time" setup check
+            // or just re-attach.
+
+            display.onfocus = function () {
+                renderParentDropdown(state.projects, display.value);
+                dropdown.style.display = 'block';
+            };
+
+            display.oninput = function () {
+                renderParentDropdown(state.projects, display.value);
+                dropdown.style.display = 'block';
+            };
+
+        }
+
+        // Global click listener for Item Dialog Dropdown
+        document.addEventListener('click', function (e) {
+            const container = document.getElementById('itemParentContainer');
+            const dropdown = document.getElementById('itemParentDropdown');
+            if (container && dropdown && !container.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        function renderParentDropdown(projects, searchTerm) {
+            const dropdown = document.getElementById('itemParentDropdown');
+            dropdown.innerHTML = '';
+
+            // Add "Inbox / No Parent" option
+            var noneDiv = document.createElement('div');
+            noneDiv.className = 'dropdown-item';
+            noneDiv.textContent = 'None (Root)';
+            noneDiv.onclick = function () {
+                document.getElementById('itemParent').value = '';
+                document.getElementById('itemParentDisplay').value = '';
+                dropdown.style.display = 'none';
+            };
+            dropdown.appendChild(noneDiv);
+
+            // Reuse the tree builder logic from before
+            // Filter active projects
+            var active = projects.filter(p => p.status !== 'dropped' && p.status !== 'completed'); // Show folders too? Yes.
+
+            var tree = buildProjectDropdownTree(active);
+            if (searchTerm) tree = filterProjectDropdownTree(tree, searchTerm.toLowerCase());
+            var flat = flattenProjectDropdownTree(tree);
+
+            flat.forEach(item => {
+                const div = document.createElement('div');
+                div.className = `dropdown-item level-${Math.min(item.level, 4)}`;
+                var icon = item.project.type === 'folder' ? 'folder_open' : 'folder';
+                div.innerHTML = `<span class="material-icons project-icon">${icon}</span>${esc(item.project.name)}`;
+                div.onclick = function () {
+                    document.getElementById('itemParent').value = item.project.id;
+                    document.getElementById('itemParentDisplay').value = item.project.name;
+                    dropdown.style.display = 'none';
+                };
+                dropdown.appendChild(div);
+            });
+        }
+
+        // --- End Unified Logic ---
         function convertCurrentTask() {
-            if (!state.currentTask || !confirm('Convert this task to a project? The task will be deleted and its sub-tasks moved.')) return;
+            if (!state.currentItem || state.currentItem.type !== 'task' || !confirm('Convert this task to a project? The task will be deleted and its sub-tasks moved.')) return;
 
-            var taskId = state.currentTask.id;
+            var taskId = state.currentItem.id;
             showToast('Converting...');
-            closeTaskDialog();
+            closeItemDialog();
 
-            // Optimistic update: Remove task from view
+            // Optimistic update
             var idx = state.tasks.findIndex(function (x) { return x.id === taskId; });
             if (idx !== -1) {
                 state.tasks.splice(idx, 1);
@@ -1784,125 +2118,15 @@
             google.script.run.withSuccessHandler(function (r) {
                 if (r.success) {
                     showToast('Converted to Project');
-                    // Reload all data to ensure project list and task hierarchy are correct
                     loadAllData();
                 } else {
                     showToast('Error: ' + (r.error || 'Unknown error'));
-                    loadAllData(); // Revert on error
+                    loadAllData();
                 }
             }).withFailureHandler(function (e) {
                 showToast('Error: ' + e);
-                loadAllData(); // Revert on error
+                loadAllData();
             }).convertTaskToProject(taskId);
-        }
-
-        function saveTask() {
-            if (!state.currentTask) return;
-            var d = {
-                title: document.getElementById('taskTitle').value,
-                notes: document.getElementById('taskNotes').value,
-                status: document.getElementById('taskStatus').value,
-                projectId: document.getElementById('taskProject').value,
-                contextId: document.getElementById('taskContext').value,
-                energyRequired: document.getElementById('taskEnergy').value,
-                dueDate: document.getElementById('taskDueDate').value,
-                scheduledDate: document.getElementById('taskScheduledDate').value,
-                timeEstimate: document.getElementById('taskTimeEstimate').value,
-                waitingFor: document.getElementById('taskWaitingFor').value
-            };
-
-            // If a project is selected, clear the parent task ID to move it to the project root
-            if (d.projectId) {
-                d.parentTaskId = '';
-            }
-
-            var id = state.currentTask.id;
-            // Optimistic update
-            var t = state.tasks.find(function (x) { return x.id === id; });
-            if (t) {
-                Object.assign(t, d);
-                renderPage(state.currentPage);
-                updateInboxBadge();
-                updateNextActionsBadge();
-            }
-            closeTaskDialog();
-            showToast('Saving...');
-
-            google.script.run.withSuccessHandler(function (r) {
-                if (r.success) {
-                    // Update with server response (e.g. modified date)
-                    var idx = state.tasks.findIndex(function (x) { return x.id === id; });
-                    if (idx !== -1) state.tasks[idx] = r.task;
-                    renderPage(state.currentPage);
-                    showToast('Saved');
-                } else {
-                    showToast('Error: ' + (r.error || 'Unknown error'));
-                    // Revert? For now just show error.
-                }
-            }).withFailureHandler(function (e) {
-                showToast('Error: ' + e);
-            }).updateTask(id, d);
-        }
-
-        function closeTaskDialog() {
-            document.getElementById('taskDialog').style.display = 'none';
-            state.currentTask = null;
-        }
-        function completeProjectClick(id) {
-            // Optimistic update
-            var p = state.projects.find(function (x) { return x.id === id; });
-            if (p) {
-                p.status = 'completed';
-                // Remove from view immediately
-                renderPage(state.currentPage);
-            }
-
-            google.script.run.withSuccessHandler(function (r) {
-                if (r.success) {
-                    showToast('Project Completed');
-                } else {
-                    // Revert if failed
-                    if (p) {
-                        p.status = 'active'; // Fallback
-                        renderPage(state.currentPage);
-                        showToast('Error: ' + (r.error || 'Unknown error'));
-                    }
-                }
-            }).withFailureHandler(function (e) {
-                showToast('Error: ' + e);
-            }).completeProject(id);
-        }
-        function deleteCurrentTask() {
-            if (!state.currentTask || !confirm('Delete task?')) return;
-
-            google.script.run.withSuccessHandler(function (r) {
-                if (r.success) {
-                    var i = state.tasks.findIndex(function (x) { return x.id === state.currentTask.id; });
-                    if (i !== -1) state.tasks.splice(i, 1);
-
-                    closeTaskDialog();
-                    updateInboxBadge();
-
-                    // Re-render current page
-                    if (state.currentPage === 'inbox') renderPage('inbox');
-                    else if (state.currentPage === 'next') renderPage('next');
-                    else if (state.currentPage === 'today') renderPage('today');
-                    else if (state.currentPage === 'scheduled') renderPage('scheduled');
-                    else if (state.currentPage === 'waiting') renderPage('waiting');
-                    else if (state.currentPage === 'someday') renderPage('someday');
-                    else if (state.currentPage === 'projects') renderPage('projects');
-                    else if (state.currentPage === 'all') renderPage('all');
-                    else if (state.currentPage === 'contexts') renderPage('contexts');
-                    else if (state.currentPage === 'areas') renderPage('areas');
-                    else if (state.currentPage === 'search') renderPage('search');
-
-                    showToast('Deleted');
-                } else {
-                    showToast('Error: ' + (r.error || 'Unknown error'));
-                }
-            }).withFailureHandler(function (e) {
-                showToast('Error: ' + e);
-            }).deleteTask(state.currentTask.id);
         }
 
         function downloadExport() {
@@ -2004,207 +2228,8 @@
                 showToast('Error: ' + e);
             }).completeTask(id);
         }
-        // Custom Parent Project Selector Logic
-        function showParentOptions() {
-            var input = document.getElementById('projectParentSearch');
-            var options = document.getElementById('projectParentOptions');
-
-            // Move options to body to avoid overflow/z-index issues
-            document.body.appendChild(options);
-
-            var rect = input.getBoundingClientRect();
-
-            options.style.top = rect.bottom + 'px';
-            options.style.left = rect.left + 'px';
-            options.style.minWidth = rect.width + 'px'; // Set min-width to input width
-            options.style.width = 'auto'; // Allow to grow based on content
-
-            options.classList.add('show');
-
-            // Close on scroll of dialog content
-            var dialogContent = document.querySelector('.dialog-content');
-            if (dialogContent) {
-                dialogContent.addEventListener('scroll', hideParentOptions, { once: true });
-            }
-
-            // Close on window resize
-            window.addEventListener('resize', hideParentOptions, { once: true });
-        }
-
-        function hideParentOptions() {
-            // Delay hiding to allow click event to register
-            setTimeout(function () {
-                var options = document.getElementById('projectParentOptions');
-                if (options) options.classList.remove('show');
-            }, 200);
-        }
-
-        function closeProjectDialog() {
-            document.getElementById('projectDialog').style.display = 'none';
-            state.currentProject = null;
-            hideParentOptions();
-        }
-
-        function filterParentProjects() {
-            var input = document.getElementById('projectParentSearch');
-            var filter = input.value.toLowerCase();
-            var options = document.getElementsByClassName('option-item');
-
-            for (var i = 0; i < options.length; i++) {
-                var txtValue = options[i].textContent || options[i].innerText;
-                if (txtValue.toLowerCase().indexOf(filter) > -1) {
-                    options[i].style.display = "";
-                } else {
-                    options[i].style.display = "none";
-                }
-            }
-        }
-
-        function selectParentProject(id, name) {
-            document.getElementById('projectParentValue').value = id;
-            document.getElementById('projectParentSearch').value = name;
-            document.getElementById('projectParentOptions').classList.remove('show');
-        }
-
-        function renderParentOptions(projects, currentId) {
-            var container = document.getElementById('projectParentOptions');
-            container.innerHTML = '';
-
-            // Add "None" option
-            var noneDiv = document.createElement('div');
-            noneDiv.className = 'option-item';
-            noneDiv.textContent = 'None';
-            noneDiv.onclick = function () { selectParentProject('', ''); };
-            container.appendChild(noneDiv);
-
-            // Build tree for dropdown
-            // We need to filter out tasks from buildUnifiedTree, so we pass an empty array for tasks
-            var tree = buildUnifiedTree([], projects);
-
-            function renderOptionsRecursive(nodes, level) {
-                nodes.forEach(function (node) {
-                    if (node.type !== 'project') return; // Ensure we only process projects
-                    var p = node.data;
-
-                    // Prevent selecting self or descendants as parent (cycle prevention)
-                    // Simple check: if p.id === currentId, skip. 
-                    // Ideally we should also skip children of currentId, but let's start with self.
-                    if (currentId && p.id === currentId) return;
-
-                    var div = document.createElement('div');
-                    div.className = 'option-item';
-                    div.style.paddingLeft = (12 + level * 20) + 'px';
-                    div.textContent = p.name;
-                    div.onclick = function () { selectParentProject(p.id, p.name); };
-                    container.appendChild(div);
-
-                    if (node.children.length > 0) {
-                        renderOptionsRecursive(node.children, level + 1);
-                    }
-                });
-            }
-
-            renderOptionsRecursive(tree, 0);
-        }
-
-        // Global click listener to close dropdown
-        document.addEventListener('click', function (e) {
-            var inputWrapper = document.getElementById('projectParentSelect');
-            var options = document.getElementById('projectParentOptions');
-
-            // If click is NOT in input wrapper AND NOT in options, hide.
-            // We check if options exists because it might be null initially or if not rendered
-            if (inputWrapper && options && options.classList.contains('show')) {
-                if (!inputWrapper.contains(e.target) && !options.contains(e.target)) {
-                    options.classList.remove('show');
-                }
-            }
-        });
-
-        function openProjectDialog(id) {
-            // Initialize Custom Selector
-            // We need to pass 'id' to exclude self from options
-            renderParentOptions(state.projects, id);
-
-            // Note: Click listener is now global
-
-            if (id) {
-                var p = state.projects.find(function (x) { return x.id === id; });
-                if (!p) return;
-                state.currentProject = p;
-                document.getElementById('projectDialogTitle').textContent = 'Edit Project';
-                document.getElementById('projectName').value = p.name;
-                document.getElementById('projectDescription').value = p.description || '';
-                document.getElementById('projectStatus').value = p.status;
-                document.getElementById('projectArea').value = p.areaId || '';
-
-                // Set Custom Selector Value
-                document.getElementById('projectParentValue').value = p.parentProjectId || '';
-                var parentName = '';
-                if (p.parentProjectId) {
-                    var parent = state.projects.find(function (x) { return x.id === p.parentProjectId; });
-                    if (parent) parentName = parent.name;
-                }
-                document.getElementById('projectParentSearch').value = parentName;
-
-                document.getElementById('projectDueDate').value = p.dueDate || '';
-                document.getElementById('deleteProjectBtn').style.display = 'inline-flex';
-            } else {
-                state.currentProject = null;
-                document.getElementById('projectDialogTitle').textContent = 'New Project';
-                document.getElementById('projectName').value = '';
-                document.getElementById('projectDescription').value = '';
-                document.getElementById('projectStatus').value = 'active';
-                document.getElementById('projectArea').value = '';
-
-                // Reset Custom Selector
-                document.getElementById('projectParentValue').value = '';
-                document.getElementById('projectParentSearch').value = '';
-
-                document.getElementById('projectDueDate').value = '';
-                document.getElementById('deleteProjectBtn').style.display = 'none';
-            }
-            document.getElementById('projectDialog').style.display = 'flex';
-        }
 
 
-        function saveProject() {
-            var d = {
-                name: document.getElementById('projectName').value,
-                description: document.getElementById('projectDescription').value,
-                status: document.getElementById('projectStatus').value,
-                areaId: document.getElementById('projectArea').value,
-                parentProjectId: document.getElementById('projectParentValue').value, // Read from hidden input
-                dueDate: document.getElementById('projectDueDate').value
-            };
-            if (state.currentProject) {
-                google.script.run.withSuccessHandler(function (r) {
-                    if (r.success) {
-                        var i = state.projects.findIndex(function (x) { return x.id === state.currentProject.id; });
-                        if (i !== -1) state.projects[i] = r.project;
-                        closeProjectDialog();
-                        populateSelects();
-                        renderPage(state.currentPage);
-                        showToast('Saved');
-                    }
-                }).withFailureHandler(function (e) { showToast('Error: ' + e); }).updateProject(state.currentProject.id, d);
-            } else {
-                google.script.run.withSuccessHandler(function (p) {
-                    state.projects.push(p); // Keep original logic for adding new project
-                    // state.areas = r.areas || []; // r is undefined here
-
-                    document.getElementById('debug-status').textContent = 'Data loaded. Updating badges...';
-
-                    updateInboxBadge();
-                    updateNextActionsBadge();
-
-                    populateSelects();
-                    renderPage(state.currentPage);
-                    showLoading(false);
-                }).withFailureHandler(function (e) { showToast('Error: ' + e); }).createProject(d);
-            }
-        }
-        function deleteCurrentProject() { if (!state.currentProject || !confirm('Delete?')) return; google.script.run.withSuccessHandler(function (r) { if (r.success) { var i = state.projects.findIndex(function (x) { return x.id === state.currentProject.id; }); if (i !== -1) state.projects.splice(i, 1); closeProjectDialog(); populateSelects(); renderPage(state.currentPage); showToast('Deleted'); } }).withFailureHandler(function (e) { showToast('Error: ' + e); }).deleteProject(state.currentProject.id); }
         function updateCurrentContext() { google.script.run.updateSetting('currentContext', document.getElementById('currentContext').value); }
         function updateCurrentEnergy() { google.script.run.updateSetting('currentEnergyLevel', document.getElementById('currentEnergy').value); }
 

@@ -1,3 +1,4 @@
+
 # GTD App for Google Apps Script
 
 A personal productivity application based on the Getting Things Done (GTD) methodology, built with Google Apps Script and HTML/CSS/JS.
@@ -5,29 +6,38 @@ A personal productivity application based on the Getting Things Done (GTD) metho
 ## Features
 
 ### Core GTD
-- **Inbox Processing**: Capture everything as tasks with `status='inbox'`. New items appear at the root level.
-- **Project Management**: Unified storage (Projects are tasks). Create sub-projects and convert tasks to projects instantly.
+- **Unified Inbox**: Capture everything as tasks with `status='inbox'`. New items (Quick Capture, Email, Import) appear here first.
+- **Unified Item Architecture**:
+    - **Tasks**: Standard actionable items (Contexts, Energy, Time).
+    - **Projects**: Multi-step outcomes (Areas, Folder hierarchy).
+    - **Folders**: Organizational containers (Ignored by attention alerts).
+    - **Single Dialog**: Edit any item type in one unified interface. Easily convert Tasks ↔ Projects ↔ Folders.
+- **Attention View**: Keep your system clean.
+    - **Stalled Projects**: Identifies active projects with no next actions.
+    - **Task Hygiene**: Flags next actions missing contexts or time estimates.
 - **Contexts**: Filter tasks by context (e.g., @home, @work).
 - **Weekly Review**: Dedicated workflow for reviewing your system.
-- **Next Actions Badge**: Visual indicator for tasks due today or overdue.
 
 ### User Experience
-- **Keyboard Shortcuts**: Gmail/Vim-style navigation (`j`/`k` to move, `x` to check, `?` for help).
-- **Mobile Optimized**: Improved Android deep linking for Gmail threads.
+- **Keyboard Shortcuts**: Power user navigation:
+    - `j` / `k`: Next / Previous Item
+    - `x`: Toggle Checkbox
+    - `#`: Delete Item
+    - `Enter` / `o`: Open Item
+    - `g` then `i`/`n`/`p`: Go to Inbox/Next/Projects
+- **Mobile Optimized**: Responsive design with sidebar navigation and optimized touch targets.
 
 ### AI & Automation
 - **AI Email Scanner**: Uses Google Gemini to scan your Gmail Inbox for actionable items.
     - Auto-discovers the best available model (e.g., Gemini 2.0 Flash).
-    - Filters out newsletters, receipts, and generic notifications (like LinkedIn).
+    - Filters out newsletters, receipts, and generic notifications.
     - Labels actionable emails as `GTD/Suggested`.
 - **Gmail Import**: Import emails labeled `GTD/ToProcess` directly as tasks.
 
 ### Advanced
 - **Search**: Hierarchical search for tasks and projects.
 - **Export**: Download your completed task history to CSV.
-- **MLO Import**: Python script (`compact_mlo.py`) to migrate from MyLifeOrganized.
 - **Database Compaction**: Clean up deleted items to keep the app fast.
-- **Unified Data Model**: Projects and Tasks share the same sheet for easier maintenance and upgrades.
 
 ## Prerequisites
 - A Google Account.
@@ -60,7 +70,7 @@ To enable the AI Email Scanner:
 - (Optional) Add `USER_EMAIL` property if you want the AI to be specific about your identity.
 
 ### 3. Initialize
-- The first time you load the web app, it will automatically create the necessary sheets (`Tasks`, `Projects`, etc.).
+- The first time you load the web app, it will automatically create the necessary sheets (`Tasks`, `Contexts`, `Areas`, `Settings`).
 
 ## Usage
 

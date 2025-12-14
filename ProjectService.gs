@@ -64,7 +64,7 @@ const ProjectService = {
       status: projectData.status || 'active', // 'active' is valid for project type
       // dueDate: projectData.dueDate,
       dueDate: projectData.dueDate,
-      type: TASK_TYPE.PROJECT,
+      type: projectData.type || TASK_TYPE.PROJECT,
       areaId: projectData.areaId,
       sortOrder: projectData.sortOrder,
       parentTaskId: projectData.parentProjectId // Map parent project to parent task
@@ -91,6 +91,7 @@ const ProjectService = {
     if (updates.dueDate !== undefined) taskUpdates.dueDate = updates.dueDate;
     if (updates.sortOrder !== undefined) taskUpdates.sortOrder = updates.sortOrder;
     if (updates.parentProjectId !== undefined) taskUpdates.parentTaskId = updates.parentProjectId;
+    if (updates.type !== undefined) taskUpdates.type = updates.type;
     
     const result = TaskService.updateTask(projectId, taskUpdates);
     
@@ -186,7 +187,9 @@ const ProjectService = {
       createdDate: task.createdDate,
       completedDate: task.completedDate,
       sortOrder: task.sortOrder,
-      parentProjectId: task.parentTaskId // Parent Task IS Parent Project
+      sortOrder: task.sortOrder,
+      parentProjectId: task.parentTaskId, // Parent Task IS Parent Project
+      type: task.type || TASK_TYPE.PROJECT
     };
   }
 };
