@@ -3,57 +3,53 @@
  * Handles all project CRUD operations
  */
 
+/**
+ * GTD System - Project Service
+ * Handles all project CRUD operations
+ * Refactored to use Tasks sheet (Type = 'project')
+ */
+
 const ProjectService = {
   
   /**
    * Get all projects
    */
   getAllProjects: function() {
-    const sheet = getSheet(SHEETS.PROJECTS);
-    const data = sheet.getDataRange().getValues();
-    const projects = [];
-    
-    for (let i = 1; i < data.length; i++) {
-      projects.push(this.rowToProject(data[i]));
-    }
-    
-    return projects;
+    // Delegate to TaskService
+    const projects = TaskService.getItemsByType(TASK_TYPE.PROJECT);
+    return projects.map(p => this.taskToProject(p));
   },
   
   /**
    * Get active projects
    */
   getActiveProjects: function() {
-    return this.getAllProjects().filter(p => p.status === PROJECT_STATUS.ACTIVE);
+    return this.getAllProjects().filter(p => p.status === 'active');
   },
   
   /**
    * Get someday projects
    */
   getSomedayProjects: function() {
-    return this.getAllProjects().filter(p => p.status === PROJECT_STATUS.SOMEDAY);
+    return this.getAllProjects().filter(p => p.status === 'someday');
   },
   
   /**
    * Get completed projects
    */
   getCompletedProjects: function() {
-    return this.getAllProjects().filter(p => p.status === PROJECT_STATUS.COMPLETED);
+    // Project 'completed' status maps to Task 'done' status internally, but project object exposes 'completed'
+    return this.getAllProjects().filter(p => p.status === 'completed');
   },
   
   /**
    * Get a single project by ID
    */
   getProject: function(projectId) {
-    const sheet = getSheet(SHEETS.PROJECTS);
-    const data = sheet.getDataRange().getValues();
-    
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][PROJECT_COLS.ID] === projectId) {
-        return this.rowToProject(data[i]);
-      }
+    const task = TaskService.getTask(projectId);
+    if (task && task.type === TASK_TYPE.PROJECT) {
+      return this.taskToProject(task);
     }
-    
     return null;
   },
   
@@ -61,71 +57,63 @@ const ProjectService = {
    * Create a new project
    */
   createProject: function(projectData) {
-    const sheet = getSheet(SHEETS.PROJECTS);
-    const timestamp = now();
-    
-    const project = {
-      id: generateUUID(),
-      name: projectData.name || '',
-      description: projectData.description || '',
-      status: projectData.status || PROJECT_STATUS.ACTIVE,
-      areaId: projectData.areaId || '',
-      dueDate: projectData.dueDate || '',
-      createdDate: timestamp,
-      completedDate: '',
-      sortOrder: projectData.sortOrder || this.getNextSortOrder(),
-      parentProjectId: projectData.parentProjectId || ''
+    // Create via TaskService
+    const taskData = {
+      title: projectData.name,
+      notes: projectData.description,
+      status: projectData.status || 'active', // 'active' is valid for project type
+      // dueDate: projectData.dueDate,
+      dueDate: projectData.dueDate,
+      type: TASK_TYPE.PROJECT,
+      areaId: projectData.areaId,
+      sortOrder: projectData.sortOrder,
+      parentTaskId: projectData.parentProjectId // Map parent project to parent task
     };
     
-    const row = this.projectToRow(project);
-    sheet.appendRow(row);
-    
-    return project;
+    const task = TaskService.createTask(taskData);
+    return this.taskToProject(task);
   },
   
   /**
    * Update an existing project
    */
   updateProject: function(projectId, updates) {
-    const sheet = getSheet(SHEETS.PROJECTS);
-    const rowNum = findRowById(sheet, projectId, PROJECT_COLS.ID);
+    // Map project updates to task updates
+    const taskUpdates = {};
+    if (updates.name !== undefined) taskUpdates.title = updates.name;
+    if (updates.description !== undefined) taskUpdates.notes = updates.description;
+    if (updates.status !== undefined) {
+        taskUpdates.status = updates.status;
+        // Map legacy statuses if needed, though 'active'/'completed' are fine
+        if (updates.status === 'completed') taskUpdates.status = STATUS.DONE;
+    } 
+    if (updates.areaId !== undefined) taskUpdates.areaId = updates.areaId;
+    if (updates.dueDate !== undefined) taskUpdates.dueDate = updates.dueDate;
+    if (updates.sortOrder !== undefined) taskUpdates.sortOrder = updates.sortOrder;
+    if (updates.parentProjectId !== undefined) taskUpdates.parentTaskId = updates.parentProjectId;
     
-    if (rowNum === -1) {
-      return { success: false, error: 'Project not found' };
+    const result = TaskService.updateTask(projectId, taskUpdates);
+    
+    if (result.success) {
+      return { success: true, project: this.taskToProject(result.task) };
     }
-    
-    const data = sheet.getRange(rowNum, 1, 1, 10).getValues()[0];
-    const project = this.rowToProject(data);
-    
-    // Apply updates
-    Object.assign(project, updates);
-    
-    // Handle completion
-    if (updates.status === PROJECT_STATUS.COMPLETED && !project.completedDate) {
-      project.completedDate = now();
-    }
-    
-    const row = this.projectToRow(project);
-    sheet.getRange(rowNum, 1, 1, row.length).setValues([row]);
-    
-    return { success: true, project: project };
+    return result;
   },
   
   /**
    * Delete a project
    */
   deleteProject: function(projectId) {
-    return this.updateProject(projectId, { status: PROJECT_STATUS.DROPPED });
+    // Delegate to TaskService soft delete
+    return TaskService.deleteTask(projectId);
   },
   
   /**
    * Complete a project
    */
   completeProject: function(projectId) {
-    return this.updateProject(projectId, { 
-      status: PROJECT_STATUS.COMPLETED,
-      completedDate: now()
-    });
+    // Delegate to TaskService complete
+    return TaskService.completeTask(projectId);
   },
   
   /**
@@ -133,7 +121,7 @@ const ProjectService = {
    */
   getProjectsWithNextActions: function() {
     const projects = this.getActiveProjects();
-    const allTasks = TaskService.getAllTasks();
+    const allTasks = TaskService.getAllTasks(); // Returns only type='task'
     
     return projects.map(project => {
       const tasks = allTasks.filter(t => 
@@ -173,46 +161,32 @@ const ProjectService = {
    * Get next sort order value
    */
   getNextSortOrder: function() {
-    const projects = this.getAllProjects();
-    if (projects.length === 0) return 1;
+    return TaskService.getNextSortOrder();
+  },
+  
+  /**
+   * Adapter: Convert Task object to Project object
+   * This maintains API compatibility for frontend
+   */
+  taskToProject: function(task) {
+    if (!task) return null;
     
-    const maxOrder = Math.max(...projects.map(p => p.sortOrder || 0));
-    return maxOrder + 1;
-  },
-  
-  /**
-   * Convert row array to project object
-   */
-  rowToProject: function(row) {
+    // Map status for frontend compatibility
+    // Internal: 'done' -> External: 'completed'
+    let status = task.status;
+    if (status === STATUS.DONE) status = 'completed';
+    
     return {
-      id: row[PROJECT_COLS.ID] || '',
-      name: row[PROJECT_COLS.NAME] || '',
-      description: row[PROJECT_COLS.DESCRIPTION] || '',
-      status: row[PROJECT_COLS.STATUS] || PROJECT_STATUS.ACTIVE,
-      areaId: row[PROJECT_COLS.AREA_ID] || '',
-      dueDate: formatDate(row[PROJECT_COLS.DUE_DATE]),
-      createdDate: formatDateTime(row[PROJECT_COLS.CREATED_DATE]),
-      completedDate: formatDateTime(row[PROJECT_COLS.COMPLETED_DATE]),
-      sortOrder: row[PROJECT_COLS.SORT_ORDER] || 0,
-      parentProjectId: row[PROJECT_COLS.PARENT_PROJECT_ID] || ''
+      id: task.id,
+      name: task.title,
+      description: task.notes,
+      status: status,
+      areaId: task.areaId,
+      dueDate: task.dueDate,
+      createdDate: task.createdDate,
+      completedDate: task.completedDate,
+      sortOrder: task.sortOrder,
+      parentProjectId: task.parentTaskId // Parent Task IS Parent Project
     };
-  },
-  
-  /**
-   * Convert project object to row array
-   */
-  projectToRow: function(project) {
-    const row = new Array(10).fill('');
-    row[PROJECT_COLS.ID] = project.id;
-    row[PROJECT_COLS.NAME] = project.name;
-    row[PROJECT_COLS.DESCRIPTION] = project.description;
-    row[PROJECT_COLS.STATUS] = project.status;
-    row[PROJECT_COLS.AREA_ID] = project.areaId;
-    row[PROJECT_COLS.DUE_DATE] = project.dueDate;
-    row[PROJECT_COLS.CREATED_DATE] = project.createdDate;
-    row[PROJECT_COLS.COMPLETED_DATE] = project.completedDate;
-    row[PROJECT_COLS.SORT_ORDER] = project.sortOrder;
-    row[PROJECT_COLS.PARENT_PROJECT_ID] = project.parentProjectId;
-    return row;
   }
 };

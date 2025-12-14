@@ -283,37 +283,32 @@ function completeProject(projectId) {
 /**
  * Convert a task to a project
  */
+/**
+ * Convert a task to a project
+ */
 function convertTaskToProject(taskId) {
   var task = TaskService.getTask(taskId);
   if (!task) return { success: false, error: 'Task not found' };
   
-  // 1. Create Project
-  var projectData = {
-    name: task.title,
-    description: task.notes,
-    status: 'active',
-    areaId: '', // Could inherit context mapping if we had it, but blank is safer
-    dueDate: task.dueDate
+  // New simplified logic: Just update the type!
+  // We maintain the ID, so all children (subtasks) remain attached automatically.
+  
+  var updates = {
+    type: TASK_TYPE.PROJECT,
+    status: 'active' // Ensure it's active
   };
   
-  var newProject = ProjectService.createProject(projectData);
+  // We can also clear contexts if projects shouldn't have them, 
+  // but keeping them might be useful? Let's keep them for flexibility.
   
-  // 2. Move Children
-  var allTasks = TaskService.getAllTasks();
-  var children = allTasks.filter(function(t) { return t.parentTaskId === taskId; });
+  var result = TaskService.updateTask(taskId, updates);
   
-  children.forEach(function(child) {
-    TaskService.updateTask(child.id, {
-      parentTaskId: '', // Clear parent task
-      projectId: newProject.id // Set new project
-    });
-  });
-  
-  // 3. Delete Original Task
-  // We use hard delete here because we are "moving" it to a project
-  TaskService.hardDeleteTask(taskId);
-  
-  return { success: true, project: newProject };
+  if (result.success) {
+    // Return formatted as a project for the frontend
+    return { success: true, project: ProjectService.getProject(taskId) };
+  } else {
+    return result;
+  }
 }
 
 /**
@@ -523,29 +518,51 @@ function compactDatabase() {
     taskSheet.getRange(1, 1, tasksToKeep.length, tasksToKeep[0].length).setValues(tasksToKeep);
   }
   
-  // 2. Compact Projects
+  // 2. Compact Projects (Legacy Sheet)
+  // We keep this for now to clean up the old sheet if it still exists
   var projectSheet = getSheet(SHEETS.PROJECTS);
-  var projectData = projectSheet.getDataRange().getValues();
-  var projectHeader = projectData[0];
-  var projectsToKeep = [projectHeader];
-  
-  for (var j = 1; j < projectData.length; j++) {
-    var pRow = projectData[j];
-    var pStatus = pRow[3]; // Project status index
-    
-    if (pStatus !== 'completed' && pStatus !== 'dropped') {
-      projectsToKeep.push(pRow);
-    } else {
-      result.projectsRemoved++;
-    }
-  }
-  
-  if (result.projectsRemoved > 0) {
-    projectSheet.clear();
-    projectSheet.getRange(2, 1, projectsToKeep.length - 1, projectsToKeep[0].length).setValues(projectsToKeep.slice(1));
+  if (projectSheet) {
+      var projectData = projectSheet.getDataRange().getValues();
+      if (projectData.length > 0) {
+          var projectHeader = projectData[0];
+          var projectsToKeep = [projectHeader];
+          
+          for (var j = 1; j < projectData.length; j++) {
+            var pRow = projectData[j];
+            var pStatus = pRow[3]; // Project status index
+            
+            if (pStatus !== 'completed' && pStatus !== 'dropped') {
+              projectsToKeep.push(pRow);
+            } else {
+              result.projectsRemoved++;
+            }
+          }
+          
+          if (result.projectsRemoved > 0) {
+            projectSheet.clear();
+            projectSheet.getRange(1, 1, projectsToKeep.length, projectsToKeep[0].length).setValues(projectsToKeep);
+          }
+      }
   }
   
   return result;
+}
+
+/**
+ * Run Data Migration (One-time)
+ */
+function runMigration() {
+  // 1. Update Schema first
+  MigrationService.updateSchema();
+  // 2. Migrate Data
+  return MigrationService.migrateProjectsToTasks();
+}
+
+/**
+ * Update Schema Only
+ */
+function updateSchema() {
+  return MigrationService.updateSchema();
 }
 
 /**

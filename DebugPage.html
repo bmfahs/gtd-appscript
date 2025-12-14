@@ -56,6 +56,8 @@
     <button onclick="testReadTasks()">4. Debug Read Tasks</button>
     <button onclick="testGetAllData()">5. Test getAllData()</button>
     <button onclick="testQuickCapture()">6. Test quickCapture()</button>
+    <button onclick="runMigration()" style="background-color: #ffeeba; border-color: #ffdf7e;">⚠️ 7. Run Project
+        Migration</button>
 
     <h2>Import Data</h2>
     <div class="test">
@@ -176,6 +178,22 @@
                     log('Failed: ' + error, true);
                 })
                 .fixProjectHeaders();
+        }
+
+        function runMigration() {
+            if (!confirm('Have you backed up your data? This will migrate all projects to the tasks sheet.')) return;
+            log('Starting migration... This may take a moment.', false);
+            google.script.run
+                .withSuccessHandler(function (result) {
+                    log('Migration Result:\n' + JSON.stringify(result, null, 2), !result.success);
+                    if (result.success) {
+                        log('Migration complete! Please refresh the page.', false);
+                    }
+                })
+                .withFailureHandler(function (error) {
+                    log('Migration FAILED:\n' + (error.message || error), true);
+                })
+                .runMigration();
         }
 
         function testInitialize() {

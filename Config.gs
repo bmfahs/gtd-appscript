@@ -49,6 +49,12 @@ const PROJECT_STATUS = {
   DROPPED: 'dropped'
 };
 
+// Task Types
+const TASK_TYPE = {
+  TASK: 'task',
+  PROJECT: 'project'
+};
+
 // Column indices for Tasks sheet (0-based)
 const TASK_COLS = {
   ID: 0,
@@ -69,10 +75,12 @@ const TASK_COLS = {
   ENERGY_REQUIRED: 15,
   TIME_ESTIMATE: 16,
   PARENT_TASK_ID: 17,
-  SORT_ORDER: 18
+  SORT_ORDER: 18,
+  TYPE: 19,
+  AREA_ID: 20
 };
 
-// Column indices for Projects sheet (0-based)
+// Column indices for Projects sheet (0-based) (Legacy/Backup)
 const PROJECT_COLS = {
   ID: 0,
   NAME: 1,

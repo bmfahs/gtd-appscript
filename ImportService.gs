@@ -35,27 +35,21 @@ const ImportService = {
       const contextCache = {};
       ContextService.getAllContexts().forEach(c => contextCache[c.name.toLowerCase()] = c);
       
-      // Batch containers
-      const tasksToCreate = [];
-      const projectsToCreate = [];
+      // Batch container
+      const itemsToCreate = [];
       
       nodes.forEach(node => {
-        this.processNode(node, null, null, results, contextCache, tasksToCreate, projectsToCreate);
+        this.processNode(node, null, null, results, contextCache, itemsToCreate, isInsideInbox);
       });
       
-      Logger.log('Tasks to create: ' + tasksToCreate.length);
-      if (tasksToCreate.length > 0) {
-        Logger.log('First task sample: ' + JSON.stringify(tasksToCreate[0]));
+      Logger.log('Items to create: ' + itemsToCreate.length);
+      if (itemsToCreate.length > 0) {
+        // We use TaskService.taskToRow for everything now
         const taskSheet = getSheet(SHEETS.TASKS);
-        const taskRows = tasksToCreate.map(t => objectToRow(t, TASK_COLS));
-        Logger.log('First task row sample: ' + JSON.stringify(taskRows[0]));
+        const taskRows = itemsToCreate.map(t => TaskService.taskToRow(t));
+        
+        // Batch write
         taskSheet.getRange(taskSheet.getLastRow() + 1, 1, taskRows.length, taskRows[0].length).setValues(taskRows);
-      }
-      
-      if (projectsToCreate.length > 0) {
-        const projectSheet = getSheet(SHEETS.PROJECTS);
-        const projectRows = projectsToCreate.map(p => objectToRow(p, PROJECT_COLS));
-        projectSheet.getRange(projectSheet.getLastRow() + 1, 1, projectRows.length, projectRows[0].length).setValues(projectRows);
       }
       
       Logger.log('Import completed. Results: ' + JSON.stringify(results));
@@ -70,7 +64,7 @@ const ImportService = {
   /**
    * Recursive function to process a TaskNode
    */
-  processNode: function(node, parentTaskId, currentProjectId, results, contextCache, tasksToCreate, projectsToCreate, isInsideInbox = false) {
+  processNode: function(node, parentTaskId, currentProjectId, results, contextCache, itemsToCreate, isInsideInbox = false) {
     let caption = 'Unknown';
     try {
       // Caption is an attribute, not a child element
@@ -83,7 +77,7 @@ const ImportService = {
       if (!caption || caption.trim() === '') {
         const children = node.getChildren('TaskNode');
         children.forEach(child => {
-          this.processNode(child, parentTaskId, currentProjectId, results, contextCache, tasksToCreate, projectsToCreate, isInsideInbox);
+          this.processNode(child, parentTaskId, currentProjectId, results, contextCache, itemsToCreate, isInsideInbox);
         });
         return;
       }
@@ -119,6 +113,7 @@ const ImportService = {
       
       if (completedDate) {
         status = STATUS.DONE;
+        // Map completed project status if needed, but 'done' is fine for unified model
       } else if (startDate && new Date(startDate) > new Date()) {
         status = STATUS.SCHEDULED;
       } else if (dueDate) {
@@ -128,64 +123,55 @@ const ImportService = {
         status = childIsInsideInbox ? STATUS.INBOX : STATUS.NEXT;
       }
       
-      let newProjectId = currentProjectId;
-      let newTaskId = null;
+      // If it's a project (and active), set status to active?
+      if (isProject && !completedDate) {
+          status = 'active'; // Project active status
+      }
+      
       const timestamp = now();
+      const uuid = generateUUID();
+      
+      // Unified Object Model
+      const itemData = {
+        id: uuid,
+        title: caption,
+        notes: note || '',
+        status: status,
+        projectId: currentProjectId || '', // Linked to parent project (legacy concept, now usually managed via parentTaskId)
+        contextId: contextId,
+        waitingFor: '',
+        dueDate: dueDate,
+        scheduledDate: startDate,
+        completedDate: completedDate ? formatDateTime(new Date(completedDate)) : '',
+        createdDate: timestamp,
+        modifiedDate: timestamp,
+        emailId: '',
+        emailThreadId: '',
+        priority: 0,
+        energyRequired: ENERGY.MEDIUM,
+        timeEstimate: '',
+        parentTaskId: parentTaskId || '', // Main hierarchy link
+        sortOrder: 0,
+        type: isProject ? TASK_TYPE.PROJECT : TASK_TYPE.TASK,
+        areaId: ''
+      };
+      
+      itemsToCreate.push(itemData);
       
       if (isProject) {
-        // Create Project Object
-        const projectId = generateUUID();
-        const projectData = {
-          id: projectId,
-          name: caption,
-          description: note || '',
-          status: completedDate ? PROJECT_STATUS.COMPLETED : PROJECT_STATUS.ACTIVE,
-          areaId: '', // Default
-          dueDate: dueDate,
-          createdDate: timestamp,
-          completedDate: completedDate ? formatDateTime(new Date(completedDate)) : '',
-          sortOrder: 0, // Default
-          parentProjectId: currentProjectId || ''
-        };
-        
-        projectsToCreate.push(projectData);
-        results.projectsCreated++;
-        newProjectId = projectId;
-        
+          results.projectsCreated++;
       } else {
-        // Create Task Object
-        const taskId = generateUUID();
-        const taskData = {
-          id: taskId,
-          title: caption,
-          notes: note || '',
-          status: status,
-          projectId: currentProjectId || '',
-          contextId: contextId,
-          waitingFor: '',
-          dueDate: dueDate,
-          scheduledDate: startDate,
-          completedDate: completedDate ? formatDateTime(new Date(completedDate)) : '',
-          createdDate: timestamp,
-          modifiedDate: timestamp,
-          emailId: '',
-          emailThreadId: '',
-          priority: 0,
-          energyRequired: ENERGY.MEDIUM,
-          timeEstimate: '',
-          parentTaskId: parentTaskId || '',
-          sortOrder: 0
-        };
-        
-        tasksToCreate.push(taskData);
-        results.tasksCreated++;
-        newTaskId = taskId;
+          results.tasksCreated++;
       }
+      
+      // For children, if this is a project, it becomes the "currentProjectId" (for legacy lookups) 
+      // AND checks parentTaskId which is the structural parent.
+      const nextProjectId = isProject ? uuid : currentProjectId;
       
       // Process Children
       const children = node.getChildren('TaskNode');
       children.forEach(child => {
-        this.processNode(child, newTaskId, newProjectId, results, contextCache, tasksToCreate, projectsToCreate, childIsInsideInbox);
+        this.processNode(child, uuid, nextProjectId, results, contextCache, itemsToCreate, childIsInsideInbox);
       });
       
     } catch (err) {

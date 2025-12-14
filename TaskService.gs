@@ -8,7 +8,10 @@ const TaskService = {
   /**
    * Get all tasks (excluding deleted)
    */
-  getAllTasks: function() {
+  /**
+   * Get all items (tasks and projects)
+   */
+  getAllItems: function() {
     var sheet = getSheet(SHEETS.TASKS);
     if (!sheet) {
       Logger.log('Tasks sheet not found!');
@@ -18,21 +21,27 @@ const TaskService = {
     var data = sheet.getDataRange().getValues();
     Logger.log('Tasks sheet has ' + data.length + ' rows');
     
-    var tasks = [];
+    var items = [];
     
     for (var i = 1; i < data.length; i++) {
       try {
-        var task = this.rowToTask(data[i]);
-        if (task.status !== STATUS.DELETED) {
-          tasks.push(task);
+        var item = this.rowToTask(data[i]);
+        if (item.status !== STATUS.DELETED) {
+            items.push(item);
         }
       } catch (e) {
         Logger.log('Error parsing row ' + i + ': ' + e.toString());
       }
     }
     
-    Logger.log('Returning ' + tasks.length + ' tasks');
-    return tasks;
+    return items;
+  },
+
+  /**
+   * Get all tasks (excluding projects and deleted)
+   */
+  getAllTasks: function() {
+    return this.getAllItems().filter(t => t.type === TASK_TYPE.TASK || !t.type);
   },
   
   /**
@@ -40,6 +49,13 @@ const TaskService = {
    */
   getTasksByStatus: function(status) {
     return this.getAllTasks().filter(t => t.status === status);
+  },
+
+  /**
+   * Get items by type
+   */
+  getItemsByType: function(type) {
+    return this.getAllItems().filter(t => t.type === type);
   },
   
   /**
@@ -98,11 +114,15 @@ const TaskService = {
       energyRequired: taskData.energyRequired || ENERGY.MEDIUM,
       timeEstimate: taskData.timeEstimate || '',
       parentTaskId: taskData.parentTaskId || '',
-      sortOrder: taskData.sortOrder || this.getNextSortOrder()
+      sortOrder: taskData.sortOrder || this.getNextSortOrder(),
+      type: taskData.type || TASK_TYPE.TASK,
+      areaId: taskData.areaId || ''
     };
     
-    // Calculate priority
-    task.priority = PriorityService.calculatePriority(task);
+    // Calculate priority if it's a task
+    if (task.type === TASK_TYPE.TASK) {
+        task.priority = PriorityService.calculatePriority(task);
+    }
     
     const row = this.taskToRow(task);
     sheet.appendRow(row);
@@ -114,6 +134,8 @@ const TaskService = {
    * Update an existing task
    */
   updateTask: function(taskId, updates) {
+    // Need to handle variable column length if schema updated but data not migrated fully?
+    // Assuming Config.gs TASK_COLS matches the sheet columns after updateSchema is run.
     const sheet = getSheet(SHEETS.TASKS);
     const rowNum = findRowById(sheet, taskId, TASK_COLS.ID);
     
@@ -121,7 +143,13 @@ const TaskService = {
       return { success: false, error: 'Task not found' };
     }
     
-    const data = sheet.getRange(rowNum, 1, 1, 19).getValues()[0];
+    // Get all columns based on Config
+    const numCols = Object.keys(TASK_COLS).length;
+    // We protect against reading more columns than exist
+    const maxCols = sheet.getLastColumn();
+    const readCols = Math.min(numCols, maxCols);
+    
+    const data = sheet.getRange(rowNum, 1, 1, readCols).getValues()[0];
     const task = this.rowToTask(data);
     
     // Apply updates
@@ -134,9 +162,13 @@ const TaskService = {
     }
     
     // Recalculate priority
-    task.priority = PriorityService.calculatePriority(task);
+    if (task.type === TASK_TYPE.TASK) {
+        task.priority = PriorityService.calculatePriority(task);
+    }
     
     const row = this.taskToRow(task);
+    // Write back. If sheet doesn't have enough columns yet, we might error if we try to set them.
+    // MigrationService.updateSchema() should be run first.
     sheet.getRange(rowNum, 1, 1, row.length).setValues([row]);
     
     return { success: true, task: task };
@@ -274,6 +306,10 @@ const TaskService = {
     const data = sheet.getDataRange().getValues();
     
     for (let i = 1; i < data.length; i++) {
+        // Only recalc for TASKS
+      const type = data[i][TASK_COLS.TYPE] || TASK_TYPE.TASK;
+      if (type !== TASK_TYPE.TASK) continue;
+
       const task = this.rowToTask(data[i]);
       if (task.status !== STATUS.DONE && task.status !== STATUS.DELETED) {
         const newPriority = PriorityService.calculatePriority(task);
@@ -288,10 +324,12 @@ const TaskService = {
    * Get next sort order value
    */
   getNextSortOrder: function() {
-    const tasks = this.getAllTasks();
-    if (tasks.length === 0) return 1;
+    // Get max sort order from relevant items? Or global?
+    // Let's use global to avoid collisions if we mix views
+    const items = this.getAllItems();
+    if (items.length === 0) return 1;
     
-    const maxOrder = Math.max(...tasks.map(t => t.sortOrder || 0));
+    const maxOrder = Math.max(...items.map(t => t.sortOrder || 0));
     return maxOrder + 1;
   },
   
@@ -322,7 +360,9 @@ const TaskService = {
       energyRequired: row[TASK_COLS.ENERGY_REQUIRED] || ENERGY.MEDIUM,
       timeEstimate: row[TASK_COLS.TIME_ESTIMATE] || '',
       parentTaskId: row[TASK_COLS.PARENT_TASK_ID] || '',
-      sortOrder: row[TASK_COLS.SORT_ORDER] || 0
+      sortOrder: row[TASK_COLS.SORT_ORDER] || 0,
+      type: row[TASK_COLS.TYPE] || TASK_TYPE.TASK,
+      areaId: row[TASK_COLS.AREA_ID] || ''
     };
   },
   
@@ -330,7 +370,10 @@ const TaskService = {
    * Convert task object to row array
    */
   taskToRow: function(task) {
-    const row = new Array(19).fill('');
+    // Ensure array is large enough for all columns
+    const maxColIndex = Math.max(...Object.values(TASK_COLS));
+    const row = new Array(maxColIndex + 1).fill('');
+    
     row[TASK_COLS.ID] = task.id;
     row[TASK_COLS.TITLE] = task.title;
     row[TASK_COLS.NOTES] = task.notes;
@@ -350,6 +393,8 @@ const TaskService = {
     row[TASK_COLS.TIME_ESTIMATE] = task.timeEstimate;
     row[TASK_COLS.PARENT_TASK_ID] = task.parentTaskId;
     row[TASK_COLS.SORT_ORDER] = task.sortOrder;
+    row[TASK_COLS.TYPE] = task.type;
+    row[TASK_COLS.AREA_ID] = task.areaId;
     return row;
   }
 };
