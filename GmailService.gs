@@ -116,10 +116,9 @@ ${truncatedBody}${body && body.length > 500 ? '...' : ''}`;
     const addedLabel = this.getOrCreateLabel(addedLabelName);
     let count = 0;
     
-    // Find <Inbox> task ID
-    const allTasks = TaskService.getAllTasks();
-    const inboxTask = allTasks.find(t => t.title === '<Inbox>');
-    const inboxId = inboxTask ? inboxTask.id : '';
+    // Inbox Unification:
+    // We no longer look for an <Inbox> folder. All new items go to root with status='inbox'.
+    const parentTaskId = '';
     
     threads.forEach(thread => {
       const message = thread.getMessages()[0]; // Use first message for details
@@ -133,7 +132,7 @@ ${truncatedBody}${body && body.length > 500 ? '...' : ''}`;
         status: STATUS.INBOX,
         emailId: message.getId(),
         emailThreadId: thread.getId(),
-        parentTaskId: inboxId // Nest under <Inbox> if it exists
+        parentTaskId: parentTaskId
       });
       
       count++;

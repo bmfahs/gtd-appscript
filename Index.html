@@ -1018,9 +1018,8 @@
         function loadAllData() { showLoading(true); google.script.run.withSuccessHandler(onDataLoaded).withFailureHandler(onDataError).getAllData(); }
         function onDataLoaded(d) {
             if (!d) { showToast('No data'); showLoading(false); return; } state.tasks = d.tasks || []; state.projects = d.projects || []; state.contexts = d.contexts || []; state.areas = d.areas || []; state.settings = d.settings || {};
-            // Find Inbox ID
-            var inboxTask = state.tasks.find(function (t) { return t.title === '<Inbox>' || t.title === 'Inbox'; });
-            state.inboxId = inboxTask ? inboxTask.id : null;
+            // Inbox Unification: logic removed
+            state.inboxId = null;
 
             // Update Badges
             updateInboxBadge();
@@ -1112,17 +1111,9 @@
         });
 
         function getInboxTasks() {
-            if (!state.inboxId) {
-                // Fallback if <Inbox> task doesn't exist: show all 'inbox' status tasks
-                return state.tasks.filter(function (x) {
-                    return x.status === 'inbox' && x.status !== 'deleted' && x.status !== 'done';
-                });
-            }
-
+            // Unified Inbox: Strictly items with status 'inbox'
             return state.tasks.filter(function (x) {
-                if (x.status === 'deleted' || x.status === 'done') return false;
-                // Strict: Only children of <Inbox>
-                return x.parentTaskId === state.inboxId;
+                return x.status === 'inbox' && x.status !== 'deleted' && x.status !== 'done';
             });
         }
 
@@ -1220,7 +1211,8 @@
 
             // Initialize map with Tasks
             tasks.forEach(function (t) {
-                if (t.status === 'deleted' || t.status === 'done') return; // Optional: filter done? User said "All Tasks"
+                // Unified View: Exclude 'inbox', 'deleted', 'done'
+                if (t.status === 'deleted' || t.status === 'done' || t.status === 'inbox') return;
                 map[t.id] = { data: t, type: 'task', children: [] };
             });
 
@@ -1238,7 +1230,7 @@
 
             // 2. Link Tasks to Parents (Task or Project)
             tasks.forEach(function (t) {
-                if (t.status === 'deleted' || t.status === 'done') return;
+                if (t.status === 'deleted' || t.status === 'done' || t.status === 'inbox') return;
                 var node = map[t.id];
 
                 // Priority: Parent Task > Project
@@ -1465,7 +1457,7 @@
                 id: tempId,
                 title: t,
                 status: 'inbox',
-                parentTaskId: state.inboxId || '', // Use cached Inbox ID
+                parentTaskId: '', // Root level for Unified Inbox
                 projectId: '',
                 contextId: '',
                 energyRequired: 'medium',

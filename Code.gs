@@ -185,24 +185,18 @@ function updateSetting(key, value) {
 /**
  * Quick capture - add to inbox
  */
+/**
+ * Quick capture - add to inbox
+ */
 function quickCapture(title, notes) {
-  var parentId = '';
+  // Inbox Unification: New items are strictly status='inbox' at the root level.
+  // We no longer nest under an "<Inbox>" folder task.
   
-  // Find Inbox task to use as parent
-  var tasks = TaskService.getAllTasks();
-  var inboxTask = tasks.find(function(t) { 
-    return t.title === '<Inbox>' || t.title === 'Inbox'; 
-  });
-  
-  if (inboxTask) {
-    parentId = inboxTask.id;
-  }
-
   return TaskService.createTask({
     title: title,
     notes: notes || '',
     status: STATUS.INBOX,
-    parentTaskId: parentId
+    parentTaskId: '' 
   });
 }
 

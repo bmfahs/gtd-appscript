@@ -125,11 +125,39 @@ const ImportService = {
       
       // If it's a project (and active), set status to active?
       if (isProject && !completedDate) {
-          status = 'active'; // Project active status
+          status = 'active';
       }
       
+      let newProjectId = currentProjectId;
+      let newTaskId = null;
       const timestamp = now();
       const uuid = generateUUID();
+      
+      // Inbox Unification:
+      // If this item is inside the <Inbox> "folder" (childIsInsideInbox is true),
+      // we want to ensure it lives at the ROOT level in our system, 
+      // but key off status='inbox'.
+      // Exception: If it has a structural parent that ISN'T the <Inbox> folder itself.
+      // logic: if parentTaskId was the ID of the <Inbox> folder, set to ''.
+      
+      // Since we recurse, 'parentTaskId' passed here is the ID of the immediate parent node.
+      // We need to know if that parent node was the ID of the <Inbox> folder.
+      // However, we don't track the parent's NAME here easily without passing it down.
+      // Simplified approach: If caption is <Inbox>, we don't create a task at all? 
+      // OR: We create it but don't use it as a parent for children?
+      
+      // New Strategy:
+      // If THIS node is <Inbox>, we skip creating it entirely, but process its children.
+      if (caption === '<Inbox>' || caption === 'Inbox') {
+           // Skip creating this container folder. 
+           // Its children will be processed with isInsideInbox=true
+           // We pass 'parentTaskId' (likely null/root) to children, so they become root.
+           const children = node.getChildren('TaskNode');
+           children.forEach(child => {
+             this.processNode(child, parentTaskId, newProjectId, results, contextCache, itemsToCreate, true);
+           });
+           return; 
+      }
       
       // Unified Object Model
       const itemData = {
