@@ -1447,7 +1447,7 @@
 
             // Email Link Icon
             if (t.emailThreadId) {
-                h += ' <a href="https://mail.google.com/mail/u/0/#inbox/' + t.emailThreadId + '" target="_blank" onclick="event.stopPropagation()" class="email-link-icon" title="Open in Gmail"><span class="material-icons" style="font-size: 16px; vertical-align: middle; color: var(--primary-color);">mail</span></a>';
+                h += ' <a href="#" onclick="event.stopPropagation(); openGmail(\'' + t.emailThreadId + '\'); return false;" class="email-link-icon" title="Open in Gmail"><span class="material-icons" style="font-size: 16px; vertical-align: middle; color: var(--primary-color);">mail</span></a>';
             }
 
             h += '</div>';
@@ -1651,7 +1651,8 @@
             var el = document.getElementById('emailLink');
             if (t.emailThreadId) {
                 el.style.display = 'block';
-                document.getElementById('emailLinkAnchor').href = 'https://mail.google.com/mail/u/0/#inbox/' + t.emailThreadId;
+                document.getElementById('emailLinkAnchor').href = '#';
+                document.getElementById('emailLinkAnchor').onclick = function () { openGmail(t.emailThreadId); return false; };
             } else {
                 el.style.display = 'none';
             }
@@ -2109,6 +2110,24 @@
 
 
         document.addEventListener('DOMContentLoaded', function () { init('inbox'); });
+        function openGmail(threadId) {
+            var userAgent = navigator.userAgent || navigator.vendor || window.opera;
+            var isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+
+            if (isIOS) {
+                // iOS: Try to open Gmail app (googlegmail://)
+                window.location.href = 'googlegmail://';
+            } else {
+                // Android & Desktop
+
+                // Construct the standard web link.
+                // Note: We avoid Android "deep links" (intent://, gmail.app.goo.gl) because
+                // they crash or fail to open specific threads. The standard URL allows
+                // the "Request Desktop Site" workaround on Android.
+                var webUrl = 'https://mail.google.com/mail/u/0/#inbox/' + threadId;
+                window.open(webUrl, '_blank');
+            }
+        }
     </script>
 </body>
 
