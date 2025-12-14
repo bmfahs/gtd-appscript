@@ -5,11 +5,15 @@ A personal productivity application based on the Getting Things Done (GTD) metho
 ## Features
 
 ### Core GTD
-- **Inbox Processing**: Quickly capture and process tasks.
-- **Project Management**: Organize tasks into projects and areas with support for sub-projects.
+- **Inbox Processing**: Capture everything as tasks with `status='inbox'`. New items appear at the root level.
+- **Project Management**: Unified storage (Projects are tasks). Create sub-projects and convert tasks to projects instantly.
 - **Contexts**: Filter tasks by context (e.g., @home, @work).
 - **Weekly Review**: Dedicated workflow for reviewing your system.
 - **Next Actions Badge**: Visual indicator for tasks due today or overdue.
+
+### User Experience
+- **Keyboard Shortcuts**: Gmail/Vim-style navigation (`j`/`k` to move, `x` to check, `?` for help).
+- **Mobile Optimized**: Improved Android deep linking for Gmail threads.
 
 ### AI & Automation
 - **AI Email Scanner**: Uses Google Gemini to scan your Gmail Inbox for actionable items.
@@ -23,6 +27,7 @@ A personal productivity application based on the Getting Things Done (GTD) metho
 - **Export**: Download your completed task history to CSV.
 - **MLO Import**: Python script (`compact_mlo.py`) to migrate from MyLifeOrganized.
 - **Database Compaction**: Clean up deleted items to keep the app fast.
+- **Unified Data Model**: Projects and Tasks share the same sheet for easier maintenance and upgrades.
 
 ## Prerequisites
 - A Google Account.
