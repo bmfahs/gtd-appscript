@@ -235,6 +235,18 @@ function updateTask(taskId, updates) {
 }
 
 /**
+ * Batch update tasks
+ */
+function updateTasks(updatesArray) {
+  // updatesArray = [{ id: '...', updates: { ... } }]
+  var results = [];
+  updatesArray.forEach(function(u) {
+    results.push(TaskService.updateTask(u.id, u.updates));
+  });
+  return { success: true, count: results.length };
+}
+
+/**
  * Complete a task
  */
 function completeTask(taskId) {
@@ -579,7 +591,7 @@ function scanInboxForSuggestions() {
  * needed because createTask is not exposed directly
  */
 function createTaskWrapper(taskData) {
-  return TaskService.createTask({
+  var task = TaskService.createTask({
     title: taskData.title,
     notes: taskData.notes,
     status: taskData.status,
@@ -593,4 +605,5 @@ function createTaskWrapper(taskData) {
     parentTaskId: taskData.parentTaskId, // Allow creating subtasks if needed
     type: taskData.type // Should always be 'task' here but good to pass
   });
+  return { success: true, task: task };
 }

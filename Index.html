@@ -1080,18 +1080,23 @@
                 return p.status === 'active' && (!p.type || p.type === 'project');
             });
             activeProjects.forEach(function (p) {
-                // Find visible tasks for this project
+                // Check 1: Has visible next actions?
                 var projectTasks = state.tasks.filter(function (t) {
                     return (t.projectId === p.id || t.parentTaskId === p.id) &&
-                        t.status !== 'done' && t.status !== 'deleted';
+                        t.status === 'next';
                 });
 
-                // Check if any have status 'next'
-                var hasNext = projectTasks.some(function (t) { return t.status === 'next'; });
+                if (projectTasks.length > 0) return; // Has next actions, so not stalled
 
-                if (!hasNext) {
-                    stalledProjects.push(p);
-                }
+                // Check 2: Has active sub-projects?
+                var childProjects = state.projects.filter(function (cp) {
+                    return cp.parentProjectId === p.id && cp.status === 'active';
+                });
+
+                if (childProjects.length > 0) return; // Has active sub-projects, so not stalled
+
+                // If neither, then it is stalled
+                stalledProjects.push(p);
             });
 
             // 2. Malformed Tasks: Next actions missing context or time
@@ -1131,31 +1136,75 @@
             // Stalled Projects
             if (data.stalledProjects.length > 0) {
                 h += '<div class="review-section"><h3><span class="material-icons" style="color: var(--warning)">warning</span> Stalled Projects (' + data.stalledProjects.length + ')</h3>';
-                h += '<p>Active projects with no Next Actions defined.</p>';
-                h += '<div class="task-list">';
+                h += '<p>Active projects with no Next Actions defined. Fix or defer them below.</p>';
+                h += '<div class="task-list" id="attentionProjectFixList">';
                 data.stalledProjects.forEach(function (p) {
-                    h += '<div class="project-card" onclick="openItemDialog(\'' + p.id + '\')" style="border-left-color: var(--warning);">';
+                    h += '<div class="project-card fix-item" data-id="' + p.id + '" onclick="openItemDialog(\'' + p.id + '\')" style="border-left-color: var(--warning);">';
                     h += '<div style="flex: 1; font-weight: 600;">' + esc(p.name) + '</div>';
+
+                    // Bulk Action Controls
+                    h += '<select class="form-control fix-status" style="width:110px; padding:4px; font-size:12px; margin-right:8px;" onclick="event.stopPropagation()">';
+                    h += '<option value="">Status...</option>'; // No change
+                    h += '<option value="someday">Someday</option>';
+                    h += '<option value="completed">Completed</option>';
+                    h += '<option value="dropped">Dropped</option>';
+                    h += '<option value="deleted">Delete</option>';
+                    h += '</select>';
+
                     h += '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openItemDialog(null, \'task\', \'' + p.id + '\')">Add Action</button>';
                     h += '</div>';
                 });
-                h += '</div></div>';
+                h += '</div>';
+                h += '<button class="add-btn" onclick="saveProjectAttentionFixes()" style="margin-top:16px; justify-content:center; background:var(--primary); color:white; border:none;"><span class="material-icons">save</span> Save Project Fixes</button>';
+                h += '</div>';
             }
 
             // Malformed Tasks
             if (data.malformedTasks.length > 0) {
                 h += '<div class="review-section"><h3><span class="material-icons" style="color: var(--danger)">error</span> Task Hygiene (' + data.malformedTasks.length + ')</h3>';
-                h += '<p>Next Actions missing context or time estimates.</p>';
-                h += '<div class="task-list">';
+                h += '<p>Next Actions missing context or time estimates. Fix them below and click Save.</p>';
+                h += '<div class="task-list" id="attentionFixList">';
+
                 data.malformedTasks.forEach(function (item) {
                     var t = item.task;
-                    h += '<div class="task-item" onclick="openItemDialog(\'' + t.id + '\')">';
+                    var issues = item.issues;
+                    var isContextMissing = issues.indexOf('No Context') !== -1;
+                    var isTimeMissing = issues.indexOf('No Time Est.') !== -1;
+
+                    h += '<div class="task-item fix-item" data-id="' + t.id + '" onclick="openItemDialog(\'' + t.id + '\')">';
                     h += '<div class="task-content">';
                     h += '<div class="task-title">' + esc(t.title) + '</div>';
-                    h += '<div class="task-meta" style="color: var(--danger)">' + item.issues.join(', ') + '</div>';
-                    h += '</div></div>';
+
+                    h += '<div class="task-meta" style="display:flex; gap:8px; align-items:center; margin-top:6px;">';
+
+                    if (isContextMissing) {
+                        h += '<select class="form-control fix-context" style="width:140px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+                        h += '<option value="">Select Context...</option>';
+                        state.contexts.forEach(function (c) {
+                            h += '<option value="' + c.id + '">' + c.icon + ' ' + c.name + '</option>';
+                        });
+                        h += '</select>';
+                    }
+
+                    if (isTimeMissing) {
+                        h += '<input type="number" class="fix-time" placeholder="Mins" style="width:70px; padding:4px; font-size:12px; border:1px solid var(--border-color); border-radius:4px;" onclick="event.stopPropagation()">';
+                    }
+
+                    // Status Dropdown
+                    h += '<select class="form-control fix-status" style="width:90px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+                    h += '<option value="">Status...</option>'; // No change
+                    h += '<option value="next">Next</option>';
+                    h += '<option value="done">Done</option>';
+                    h += '<option value="waiting">Waiting</option>';
+                    h += '<option value="someday">Someday</option>';
+                    h += '<option value="deleted">Delete</option>';
+                    h += '</select>';
+
+                    h += '</div></div></div>';
                 });
-                h += '</div></div>';
+                h += '</div>';
+                h += '<button class="add-btn" onclick="saveAttentionFixes()" style="margin-top:16px; justify-content:center; background:var(--primary); color:white; border:none;"><span class="material-icons">save</span> Save All Fixes</button>';
+                h += '</div>';
             }
 
             return h;
@@ -2200,6 +2249,101 @@
             }
 
             runBatch();
+        }
+
+        function saveAttentionFixes() {
+            var items = document.querySelectorAll('#attentionFixList .fix-item');
+            var updates = [];
+
+            items.forEach(function (el) {
+                var id = el.dataset.id;
+                var contextSelect = el.querySelector('.fix-context');
+                var timeInput = el.querySelector('.fix-time');
+                var statusSelect = el.querySelector('.fix-status');
+                var hasUpdates = false;
+                var u = {};
+
+                if (contextSelect && contextSelect.value) {
+                    u.contextId = contextSelect.value;
+                    hasUpdates = true;
+                }
+
+                if (timeInput && timeInput.value) {
+                    u.timeEstimate = timeInput.value;
+                    hasUpdates = true;
+                }
+
+                if (statusSelect && statusSelect.value) {
+                    u.status = statusSelect.value;
+                    hasUpdates = true;
+                }
+
+                if (hasUpdates) {
+                    updates.push({ id: id, updates: u });
+                }
+            });
+
+            if (updates.length === 0) {
+                showToast('No changes to save');
+                return;
+            }
+
+            showLoading(true);
+            google.script.run.withSuccessHandler(function (r) {
+                if (r.success) {
+                    showToast('Fixed ' + r.count + ' tasks');
+                    loadAllData();
+                } else {
+                    showToast('Error: ' + r.error);
+                    showLoading(false);
+                }
+            }).withFailureHandler(function (e) {
+                showToast('Error: ' + e);
+                showLoading(false);
+            }).updateTasks(updates);
+        }
+
+        function saveProjectAttentionFixes() {
+            var items = document.querySelectorAll('#attentionProjectFixList .fix-item');
+            var updates = [];
+
+            items.forEach(function (el) {
+                var id = el.dataset.id;
+                var statusSelect = el.querySelector('.fix-status');
+
+                if (statusSelect && statusSelect.value) {
+                    var u = { status: statusSelect.value };
+                    // Map 'completed' to 'done' if necessary, but 'completed' is standard for projects in frontend state often.
+                    // However, backend TaskService uses 'done'. 
+                    // Code.gs updateProject maps 'completed' -> 'done'.
+                    // But updateTasks calls TaskService.updateTask directly.
+                    // TaskService.updateTask expects 'done' for completion. 
+                    // ProjectService.taskToProject maps 'done' -> 'completed'.
+
+                    // So if we send 'completed', TaskService might just store 'completed' as a string if enum isn't strict.
+                    // But strictly we should send 'done' if we are bypassing ProjectService.updateProject logic.
+                    // Actually, let's keep it safe:
+                    if (u.status === 'completed') u.status = 'done';
+
+                    updates.push({ id: id, updates: u });
+                }
+            });
+
+            if (updates.length === 0) {
+                showToast('No changes to save');
+                return;
+            }
+
+            showLoading(true);
+            google.script.run.withSuccessHandler(function (r) {
+                if (r.success) {
+                    showToast('Updated ' + r.count + ' projects');
+                    loadAllData();
+                } else {
+                    showToast('Error: ' + r.error);
+                    showLoading(false);
+                }
+            }).updateTasks(updates);
         }
 
         function completeTaskClick(id) {
