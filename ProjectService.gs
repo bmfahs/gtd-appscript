@@ -189,7 +189,8 @@ const ProjectService = {
       sortOrder: task.sortOrder,
       sortOrder: task.sortOrder,
       parentProjectId: task.parentTaskId, // Parent Task IS Parent Project
-      type: task.type || TASK_TYPE.PROJECT
+      type: task.type || TASK_TYPE.PROJECT,
+      scheduledDate: task.scheduledDate
     };
   }
 };

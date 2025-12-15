@@ -295,7 +295,7 @@
             background: var(--bg-primary);
             border-radius: var(--border-radius);
             border: 1px solid var(--border-color);
-            overflow: hidden;
+            /* overflow: hidden; Removed to allow dropdowns */
         }
 
         .task-item {
@@ -1095,6 +1095,12 @@
 
                 if (childProjects.length > 0) return; // Has active sub-projects, so not stalled
 
+                // Check 3: Is scheduled for the future?
+                if (p.scheduledDate) {
+                    var today = new Date().toISOString().split('T')[0];
+                    if (p.scheduledDate > today) return; // Scheduled for future, so not stalled
+                }
+
                 // If neither, then it is stalled
                 stalledProjects.push(p);
             });
@@ -1109,7 +1115,14 @@
                 // Let's be strict as requested
                 if (!t.timeEstimate) issues.push('No Time Est.');
 
-                if (issues.length > 0) {
+                // Filter: If scheduled date is in the future, ignore
+                var isFutureScheduled = false;
+                if (t.scheduledDate) {
+                    var today = new Date().toISOString().split('T')[0];
+                    if (t.scheduledDate > today) isFutureScheduled = true;
+                }
+
+                if (issues.length > 0 && !isFutureScheduled) {
                     malformedTasks.push({ task: t, issues: issues });
                 }
             });
@@ -1143,6 +1156,9 @@
                     h += '<div style="flex: 1; font-weight: 600;">' + esc(p.name) + '</div>';
 
                     // Bulk Action Controls
+                    h += '<div style="display:flex; align-items:center;">';
+                    h += '<input type="date" class="form-control fix-scheduled" value="' + (p.scheduledDate || '') + '" style="width:130px; padding:3px; font-size:12px; margin-right:8px;" onclick="event.stopPropagation()">';
+
                     h += '<select class="form-control fix-status" style="width:110px; padding:4px; font-size:12px; margin-right:8px;" onclick="event.stopPropagation()">';
                     h += '<option value="">Status...</option>'; // No change
                     h += '<option value="someday">Someday</option>';
@@ -1150,6 +1166,7 @@
                     h += '<option value="dropped">Dropped</option>';
                     h += '<option value="deleted">Delete</option>';
                     h += '</select>';
+                    h += '</div>';
 
                     h += '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openItemDialog(null, \'task\', \'' + p.id + '\')">Add Action</button>';
                     h += '</div>';
@@ -1199,6 +1216,9 @@
                     h += '<option value="someday">Someday</option>';
                     h += '<option value="deleted">Delete</option>';
                     h += '</select>';
+
+                    // Scheduled Date
+                    h += '<input type="date" class="form-control fix-scheduled" value="' + (t.scheduledDate || '') + '" style="width:110px; padding:3px; font-size:12px;" onclick="event.stopPropagation()">';
 
                     h += '</div></div></div>';
                 });
@@ -1413,18 +1433,225 @@
             });
         }
 
+        // Helper to get parent name
+        function getParentProjectName(id) {
+            if (!id) return '';
+            var p = state.projects.find(function (x) { return x.id === id; });
+            return p ? p.name : '';
+        }
+
         function renderInbox() {
             var t = getInboxTasks();
             var h = '<div class="page-header"><h2>Inbox</h2><p>Capture everything, process later</p></div>';
             // Add Import Button
             h += '<div style="margin-bottom: 16px;">' +
                 '<button class="btn btn-secondary" onclick="importGmail()" style="margin-right: 8px;"><span class="material-icons">download</span> Import (GTD/ToProcess)</button>' +
-                '<button class="btn btn-secondary" onclick="scanInbox()"><span class="material-icons">psychology</span> Scan Inbox (AI)</button>' +
+                '<button class="btn btn-secondary" onclick="scanInbox()" style="margin-right: 8px;"><span class="material-icons">psychology</span> Scan Inbox (AI)</button>' +
                 '</div>';
 
-            if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">inbox</span><h3>Inbox Zero!</h3><p>Everything processed.</p></div>';
-            else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; }
+            if (t.length === 0) {
+                h += '<div class="empty-state"><span class="material-icons">inbox</span><h3>Inbox Zero!</h3><p>Everything processed.</p></div>';
+            } else {
+                h += '<div class="task-list" id="inboxList">';
+                // Header Row for Bulk Edit
+                h += '<div style="display:flex; padding:8px 16px; font-weight:600; font-size:12px; color:var(--text-muted); border-bottom:1px solid var(--border-color);">';
+                h += '<div style="flex:2">Task</div>'; // Title
+                h += '<div style="flex:0 0 140px; margin-right:8px">Project</div>';
+                h += '<div style="flex:0 0 110px; margin-right:8px">Context</div>';
+                h += '<div style="flex:0 0 100px; margin-right:8px">Actions</div>'; // Status/Date/etc
+                h += '</div>';
+
+                t.forEach(function (x) { h += renderInboxBulkRow(x); });
+                h += '</div>';
+                h += '<button class="add-btn" onclick="saveInboxUpdates()" style="margin-top:16px; justify-content:center; background:var(--primary); color:white; border:none;"><span class="material-icons">save</span> Process Inbox</button>';
+            }
             return h;
+        }
+
+        function renderInboxBulkRow(t) {
+            // Compact row with inline edits
+            // Fields: Title (read-only link), Project, Context, Scheduled, Status, Time, Energy, Due
+
+            var h = '<div class="task-item fix-item" data-id="' + t.id + '" style="flex-direction:column; align-items:stretch; gap:8px; cursor:default;">';
+
+            // Top: Title (Click to open dialog still works?) -> Let's make title clickable
+            h += '<div class="task-title" onclick="openItemDialog(\'' + t.id + '\')" style="cursor:pointer; font-weight:600; color:var(--primary);">' + esc(t.title) + '</div>';
+
+            // Middle: Project & Context & Status
+            h += '<div style="display:flex; gap:8px; flex-wrap:wrap;">';
+
+            // Project Selector (Hierarchical Custom Dropdown)
+            // Need a container for relative positioning
+            h += '<div style="flex:1; min-width:120px; position:relative;">';
+            h += '<input type="text" class="form-control fix-project-display" placeholder="Select Project..." value="' + esc(getParentProjectName(t.projectId)) + '" onfocus="showInlineProjectDropdown(this)" oninput="filterInlineProjectDropdown(this)" onclick="event.stopPropagation()" style="width:100%; padding:4px; font-size:12px;">';
+            h += '<input type="hidden" class="fix-project" value="' + (t.projectId || '') + '">';
+            // Dropdown container
+            h += '<div class="fix-project-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:200px; overflow-y:auto; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:4px; z-index:1000; box-shadow:0 4px 6px rgba(0,0,0,0.1);"></div>';
+            h += '</div>';
+
+            // Context Selector
+            h += '<select class="form-control fix-context" style="width:120px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            h += '<option value="">Context...</option>';
+            state.contexts.forEach(function (c) {
+                var sel = (t.contextId === c.id) ? 'selected' : '';
+                h += '<option value="' + c.id + '" ' + sel + '>' + c.icon + ' ' + c.name + '</option>';
+            });
+            h += '</select>';
+
+            // Status Selector
+            h += '<select class="form-control fix-status" style="width:100px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            var statuses = ['inbox', 'next', 'waiting', 'scheduled', 'someday', 'done', 'deleted'];
+            statuses.forEach(function (s) {
+                var sel = (t.status === s) ? 'selected' : '';
+                h += '<option value="' + s + '" ' + sel + '>' + s.charAt(0).toUpperCase() + s.slice(1) + '</option>';
+            });
+            h += '</select>';
+
+            h += '</div>'; // End Middle
+
+            // Bottom: Dates & Details
+            h += '<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">';
+
+            // Due Date
+            h += '<span style="font-size:11px; color:var(--text-muted)">Due:</span>';
+            h += '<input type="date" class="form-control fix-due" value="' + (t.dueDate || '') + '" style="width:110px; padding:3px; font-size:12px;" onclick="event.stopPropagation()">';
+
+            // Scheduled
+            h += '<span style="font-size:11px; color:var(--text-muted)">Sched:</span>';
+            h += '<input type="date" class="form-control fix-scheduled" value="' + (t.scheduledDate || '') + '" style="width:110px; padding:3px; font-size:12px;" onclick="event.stopPropagation()">';
+
+            // Time
+            h += '<input type="number" class="fix-time" placeholder="Min" value="' + (t.timeEstimate || '') + '" style="width:50px; padding:4px; font-size:12px; border:1px solid var(--border-color); border-radius:4px;" onclick="event.stopPropagation()">';
+
+            // Energy
+            h += '<select class="form-control fix-energy" style="width:80px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            h += '<option value="medium" ' + (t.energyRequired === 'medium' ? 'selected' : '') + '>⚡ Med</option>';
+            h += '<option value="high" ' + (t.energyRequired === 'high' ? 'selected' : '') + '>⚡ High</option>';
+            h += '<option value="low" ' + (t.energyRequired === 'low' ? 'selected' : '') + '>⚡ Low</option>';
+            h += '</select>';
+
+            h += '</div>'; // End Bottom
+
+            h += '</div>';
+            return h;
+        }
+
+        // Inline Project Dropdown Logic
+        function showInlineProjectDropdown(input) {
+            // Close others?
+            document.querySelectorAll('.fix-project-dropdown').forEach(d => {
+                d.style.display = 'none';
+                d.closest('.fix-item').style.zIndex = '';
+                d.closest('.fix-item').style.position = '';
+            });
+
+            var container = input.parentElement;
+            var dropdown = container.querySelector('.fix-project-dropdown');
+            dropdown.style.display = 'block';
+
+            // Raise z-index of the row
+            var row = container.closest('.fix-item');
+            if (row) {
+                row.style.position = 'relative';
+                row.style.zIndex = '1000';
+            }
+
+            renderInlineProjectDropdown(dropdown, state.projects, input.value);
+
+            // Global click to close
+            document.addEventListener('click', function close(e) {
+                if (!container.contains(e.target)) {
+                    dropdown.style.display = 'none';
+                    if (row) {
+                        row.style.zIndex = '';
+                        row.style.position = '';
+                    }
+                    document.removeEventListener('click', close);
+                }
+            });
+        }
+
+        function filterInlineProjectDropdown(input) {
+            var container = input.parentElement;
+            var dropdown = container.querySelector('.fix-project-dropdown');
+            renderInlineProjectDropdown(dropdown, state.projects, input.value);
+        }
+
+        // Helper to build a hierarchical project tree
+        function buildProjectTree(projects) {
+            var projectMap = {};
+            var roots = [];
+
+            projects.forEach(function (p) {
+                projectMap[p.id] = { project: p, children: [] };
+            });
+
+            projects.forEach(function (p) {
+                if (p.parentProjectId && projectMap[p.parentProjectId]) {
+                    projectMap[p.parentProjectId].children.push(projectMap[p.id]);
+                } else {
+                    roots.push(projectMap[p.id]);
+                }
+            });
+
+            // Sort children by name
+            function sortTree(nodes) {
+                nodes.sort((a, b) => a.project.name.localeCompare(b.project.name));
+                nodes.forEach(node => sortTree(node.children));
+            }
+            sortTree(roots);
+
+            return roots;
+        }
+
+        function renderInlineProjectDropdown(container, projects, filter) {
+            var h = '';
+            var matches = [];
+
+            var tree = buildProjectTree(state.projects.filter(p => p.status === 'active'));
+
+            function traverseTree(nodes, depth) {
+                nodes.forEach(function (node) {
+                    var p = node.project;
+                    var match = !filter || p.name.toLowerCase().includes(filter.toLowerCase());
+                    if (match) {
+                        matches.push({ item: p, depth: depth });
+                    }
+                    traverseTree(node.children, depth + 1);
+                });
+            }
+            traverseTree(tree, 0);
+
+            if (matches.length === 0) {
+                h = '<div style="padding:8px; color:var(--text-muted); font-size:12px;">No projects found</div>';
+            } else {
+                h += '<div class="dropdown-item" onclick="selectInlineProject(this, \'\', \'No Project\')" style="padding:6px 12px; cursor:pointer; font-size:12px;">No Project</div>';
+                matches.forEach(function (m) {
+                    var p = m.item;
+                    var pad = m.depth * 12; // Indent
+                    h += '<div class="dropdown-item" onclick="selectInlineProject(this, \'' + p.id + '\', \'' + esc(p.name).replace(/'/g, "\\'") + '\')" style="padding:6px 12px 6px ' + (12 + pad) + 'px; cursor:pointer; font-size:12px;">';
+                    if (p.type === 'folder') h += '<span class="material-icons" style="font-size:14px; vertical-align:middle; margin-right:4px;">folder</span>';
+                    else h += '<span class="material-icons" style="font-size:14px; vertical-align:middle; margin-right:4px;">assignment</span>';
+                    h += esc(p.name) + '</div>';
+                });
+            }
+            container.innerHTML = h;
+        }
+
+        function selectInlineProject(el, id, name) {
+            var container = el.closest('.fix-item').querySelector('.fix-project').parentElement; // div container
+            var display = container.querySelector('.fix-project-display');
+            var hidden = container.querySelector('.fix-project');
+            var dropdown = container.querySelector('.fix-project-dropdown');
+            var row = el.closest('.fix-item');
+
+            display.value = name;
+            hidden.value = id;
+            dropdown.style.display = 'none';
+            if (row) {
+                row.style.zIndex = '';
+                row.style.position = '';
+            }
         }
 
         function updateInboxBadge() {
@@ -1954,9 +2181,11 @@
                 taskFields.style.display = 'block';
                 projectFields.style.display = 'none';
 
-                // Status specific visibility (e.g. Waiting For, Scheduled)
+                // Status specific visibility (e.g. Waiting For)
                 document.getElementById('itemWaitingForGroup').style.display = (status === 'waiting') ? 'block' : 'none';
-                document.getElementById('scheduledDateGroup').style.display = (status === 'scheduled') ? 'block' : 'none';
+
+                // Allow editing scheduled date for any status (it might trigger status change logic in backend or just be metadata)
+                document.getElementById('scheduledDateGroup').style.display = 'block';
 
             } else {
                 // Project or Folder
@@ -1964,7 +2193,7 @@
                 projectFields.style.display = 'block';
 
                 document.getElementById('itemWaitingForGroup').style.display = 'none';
-                document.getElementById('scheduledDateGroup').style.display = 'none'; // Projects usually just have due date
+                document.getElementById('scheduledDateGroup').style.display = 'block'; // Allow for projects too
             }
         }
 
@@ -2278,6 +2507,12 @@
                     hasUpdates = true;
                 }
 
+                var scheduledInput = el.querySelector('.fix-scheduled');
+                if (scheduledInput && scheduledInput.value) {
+                    u.scheduledDate = scheduledInput.value;
+                    hasUpdates = true;
+                }
+
                 if (hasUpdates) {
                     updates.push({ id: id, updates: u });
                 }
@@ -2303,6 +2538,71 @@
             }).updateTasks(updates);
         }
 
+        function saveInboxUpdates() {
+            var items = document.querySelectorAll('#inboxList .fix-item');
+            var updates = [];
+
+            items.forEach(function (el) {
+                var id = el.dataset.id;
+                var u = {};
+                var hasUpdates = false;
+
+                // Project
+                var proj = el.querySelector('.fix-project');
+                if (proj && proj.value) { u.projectId = proj.value; hasUpdates = true; }
+
+                // Context
+                var ctx = el.querySelector('.fix-context');
+                if (ctx && ctx.value) { u.contextId = ctx.value; hasUpdates = true; }
+
+                // Status
+                var stat = el.querySelector('.fix-status');
+                if (stat && stat.value && stat.value !== 'inbox') {
+                    u.status = stat.value;
+                    hasUpdates = true;
+                }
+
+                // Due Date
+                var due = el.querySelector('.fix-due');
+                if (due && due.value) { u.dueDate = due.value; hasUpdates = true; }
+
+                // Scheduled Date
+                var sched = el.querySelector('.fix-scheduled');
+                if (sched && sched.value) { u.scheduledDate = sched.value; hasUpdates = true; }
+
+                // Time
+                var time = el.querySelector('.fix-time');
+                if (time && time.value) { u.timeEstimate = time.value; hasUpdates = true; }
+
+                // Energy
+                var energy = el.querySelector('.fix-energy');
+                if (energy && energy.value && energy.value !== 'medium') { u.energyRequired = energy.value; hasUpdates = true; }
+
+                if (hasUpdates) {
+                    updates.push({ id: id, updates: u });
+                }
+            });
+
+            if (updates.length === 0) {
+                showToast('No changes made');
+                return;
+            }
+
+            showLoading(true);
+            google.script.run.withSuccessHandler(function (r) {
+                if (r.success) {
+                    showToast('Processed ' + r.count + ' items');
+                    loadAllData();
+                } else {
+                    showToast('Error: ' + r.error);
+                    showLoading(false);
+                }
+            }).withFailureHandler(function (e) {
+                showToast('Error: ' + e);
+                showLoading(false);
+            }).updateTasks(updates);
+        }
+
         function saveProjectAttentionFixes() {
             var items = document.querySelectorAll('#attentionProjectFixList .fix-item');
             var updates = [];
@@ -2310,21 +2610,26 @@
             items.forEach(function (el) {
                 var id = el.dataset.id;
                 var statusSelect = el.querySelector('.fix-status');
+                var scheduledInput = el.querySelector('.fix-scheduled');
+
+                var u = {};
+                var hasUpdates = false;
 
                 if (statusSelect && statusSelect.value) {
-                    var u = { status: statusSelect.value };
-                    // Map 'completed' to 'done' if necessary, but 'completed' is standard for projects in frontend state often.
-                    // However, backend TaskService uses 'done'. 
-                    // Code.gs updateProject maps 'completed' -> 'done'.
-                    // But updateTasks calls TaskService.updateTask directly.
-                    // TaskService.updateTask expects 'done' for completion. 
-                    // ProjectService.taskToProject maps 'done' -> 'completed'.
-
-                    // So if we send 'completed', TaskService might just store 'completed' as a string if enum isn't strict.
-                    // But strictly we should send 'done' if we are bypassing ProjectService.updateProject logic.
-                    // Actually, let's keep it safe:
+                    u.status = statusSelect.value;
                     if (u.status === 'completed') u.status = 'done';
+                    hasUpdates = true;
+                }
 
+                if (scheduledInput && scheduledInput.value) {
+                    u.scheduledDate = scheduledInput.value;
+                    // If scheduling into the future, maybe we should auto-set status to scheduled?
+                    // User only asked to edit the date. Let's stick to that unless explicit.
+                    // But if it's stalled active project, maybe they want it scheduled.
+                    hasUpdates = true;
+                }
+
+                if (hasUpdates) {
                     updates.push({ id: id, updates: u });
                 }
             });
