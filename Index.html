@@ -1157,7 +1157,14 @@
 
                     // Bulk Action Controls
                     h += '<div style="display:flex; align-items:center;">';
-                    h += '<input type="date" class="form-control fix-scheduled" value="' + (p.scheduledDate || '') + '" style="width:130px; padding:3px; font-size:12px; margin-right:8px;" onclick="event.stopPropagation()">';
+
+                    // Scheduled Date
+                    h += '<span style="font-size:10px; color:var(--text-muted); margin-right:4px;">Sched:</span>';
+                    h += '<input type="date" class="form-control fix-scheduled" value="' + (p.scheduledDate || '') + '" style="width:115px; padding:3px; font-size:12px; margin-right:8px;" onclick="event.stopPropagation()">';
+
+                    // Due Date
+                    h += '<span style="font-size:10px; color:var(--text-muted); margin-right:4px;">Due:</span>';
+                    h += '<input type="date" class="form-control fix-due" value="' + (p.dueDate || '') + '" style="width:115px; padding:3px; font-size:12px; margin-right:8px;" onclick="event.stopPropagation()">';
 
                     h += '<select class="form-control fix-status" style="width:110px; padding:4px; font-size:12px; margin-right:8px;" onclick="event.stopPropagation()">';
                     h += '<option value="">Status...</option>'; // No change
@@ -1194,13 +1201,14 @@
 
                     h += '<div class="task-meta" style="display:flex; gap:8px; align-items:center; margin-top:6px;">';
 
-                    if (isContextMissing) {
-                        h += '<select class="form-control fix-type" style="width:90px; padding:4px; font-size:12px; margin-right:8px;" onclick="event.stopPropagation()">';
-                        h += '<option value="task">Task</option>';
-                        h += '<option value="project">Project</option>';
-                        h += '<option value="folder">Folder</option>';
-                        h += '</select>';
+                    // Type Selector (Always show)
+                    h += '<select class="form-control fix-type" style="width:90px; padding:4px; font-size:12px; margin-right:8px;" onclick="event.stopPropagation()">';
+                    h += '<option value="task" ' + (t.type === 'task' || !t.type ? 'selected' : '') + '>Task</option>';
+                    h += '<option value="project" ' + (t.type === 'project' ? 'selected' : '') + '>Project</option>';
+                    h += '<option value="folder" ' + (t.type === 'folder' ? 'selected' : '') + '>Folder</option>';
+                    h += '</select>';
 
+                    if (isContextMissing) {
                         h += '<select class="form-control fix-context" style="width:140px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
                         h += '<option value="">Select Context...</option>';
                         state.contexts.forEach(function (c) {
@@ -1223,8 +1231,13 @@
                     h += '<option value="deleted">Delete</option>';
                     h += '</select>';
 
-                    // Scheduled Date
+                    // Scheduled (Always show)
+                    h += '<span style="font-size:10px; color:var(--text-muted); margin-left:8px; margin-right:2px;">Sched:</span>';
                     h += '<input type="date" class="form-control fix-scheduled" value="' + (t.scheduledDate || '') + '" style="width:110px; padding:3px; font-size:12px;" onclick="event.stopPropagation()">';
+
+                    // Due (Always show)
+                    h += '<span style="font-size:10px; color:var(--text-muted); margin-left:8px; margin-right:2px;">Due:</span>';
+                    h += '<input type="date" class="form-control fix-due" value="' + (t.dueDate || '') + '" style="width:110px; padding:3px; font-size:12px;" onclick="event.stopPropagation()">';
 
                     h += '</div></div></div>';
                 });
@@ -2544,6 +2557,12 @@
                     hasUpdates = true;
                 }
 
+                var dueInput = el.querySelector('.fix-due');
+                if (dueInput && dueInput.value) {
+                    u.dueDate = dueInput.value;
+                    hasUpdates = true;
+                }
+
                 if (hasUpdates) {
                     updates.push({ id: id, updates: u });
                 }
@@ -2673,6 +2692,12 @@
                     // If scheduling into the future, maybe we should auto-set status to scheduled?
                     // User only asked to edit the date. Let's stick to that unless explicit.
                     // But if it's stalled active project, maybe they want it scheduled.
+                    hasUpdates = true;
+                }
+
+                var dueInput = el.querySelector('.fix-due');
+                if (dueInput && dueInput.value) {
+                    u.dueDate = dueInput.value;
                     hasUpdates = true;
                 }
 

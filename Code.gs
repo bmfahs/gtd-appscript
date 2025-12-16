@@ -124,9 +124,9 @@ function getAllData() {
         return (t.type === TASK_TYPE.TASK || !t.type) && t.status !== STATUS.DONE;
     });
 
-    // Filter Projects (Type = Project, and Status != 'completed' which maps to 'done' internally)
+    // Filter Projects (Type = Project OR Folder, and Status != 'completed' which maps to 'done' internally)
     const activeProjectItems = allItems.filter(function(t) {
-        return t.type === TASK_TYPE.PROJECT && t.status !== STATUS.DONE;
+        return (t.type === TASK_TYPE.PROJECT || t.type === TASK_TYPE.FOLDER) && t.status !== STATUS.DONE;
     });
 
     // Map to Project objects
