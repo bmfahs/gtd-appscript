@@ -1195,6 +1195,12 @@
                     h += '<div class="task-meta" style="display:flex; gap:8px; align-items:center; margin-top:6px;">';
 
                     if (isContextMissing) {
+                        h += '<select class="form-control fix-type" style="width:90px; padding:4px; font-size:12px; margin-right:8px;" onclick="event.stopPropagation()">';
+                        h += '<option value="task">Task</option>';
+                        h += '<option value="project">Project</option>';
+                        h += '<option value="folder">Folder</option>';
+                        h += '</select>';
+
                         h += '<select class="form-control fix-context" style="width:140px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
                         h += '<option value="">Select Context...</option>';
                         state.contexts.forEach(function (c) {
@@ -1456,6 +1462,7 @@
                 // Header Row for Bulk Edit
                 h += '<div style="display:flex; padding:8px 16px; font-weight:600; font-size:12px; color:var(--text-muted); border-bottom:1px solid var(--border-color);">';
                 h += '<div style="flex:2">Task</div>'; // Title
+                h += '<div style="flex:0 0 100px; margin-right:8px">Type</div>'; // Type
                 h += '<div style="flex:0 0 140px; margin-right:8px">Project</div>';
                 h += '<div style="flex:0 0 110px; margin-right:8px">Context</div>';
                 h += '<div style="flex:0 0 100px; margin-right:8px">Actions</div>'; // Status/Date/etc
@@ -1479,6 +1486,13 @@
 
             // Middle: Project & Context & Status
             h += '<div style="display:flex; gap:8px; flex-wrap:wrap;">';
+
+            // Type Selector
+            h += '<select class="form-control fix-type" style="width:100px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            h += '<option value="task" ' + (t.type === 'task' || !t.type ? 'selected' : '') + '>Task</option>';
+            h += '<option value="project" ' + (t.type === 'project' ? 'selected' : '') + '>Project</option>';
+            h += '<option value="folder" ' + (t.type === 'folder' ? 'selected' : '') + '>Folder</option>';
+            h += '</select>';
 
             // Project Selector (Hierarchical Custom Dropdown)
             // Need a container for relative positioning
@@ -2192,6 +2206,12 @@
                 taskFields.style.display = 'none';
                 projectFields.style.display = 'block';
 
+                // Auto-switch status to 'active' if current status is transient (inbox/next/waiting/scheduled?)
+                // Users expect projects to be Active by default if they are promoting a task.
+                if (status === 'inbox' || status === 'next' || status === 'waiting') {
+                    document.getElementById('itemStatus').value = 'active';
+                }
+
                 document.getElementById('itemWaitingForGroup').style.display = 'none';
                 document.getElementById('scheduledDateGroup').style.display = 'block'; // Allow for projects too
             }
@@ -2507,6 +2527,17 @@
                     hasUpdates = true;
                 }
 
+                var typeSelect = el.querySelector('.fix-type');
+                if (typeSelect && typeSelect.value) {
+                    u.type = typeSelect.value;
+                    hasUpdates = true;
+
+                    // Auto-set status to 'active' if converting to Project/Folder
+                    if ((u.type === 'project' || u.type === 'folder') && !u.status) {
+                        u.status = 'active';
+                    }
+                }
+
                 var scheduledInput = el.querySelector('.fix-scheduled');
                 if (scheduledInput && scheduledInput.value) {
                     u.scheduledDate = scheduledInput.value;
@@ -2546,6 +2577,22 @@
                 var id = el.dataset.id;
                 var u = {};
                 var hasUpdates = false;
+
+                // Type
+                var type = el.querySelector('.fix-type');
+                if (type && type.value) {
+                    u.type = type.value;
+                    hasUpdates = true;
+
+                    // Auto-set status to 'active' if converting to Project/Folder and status is not explicitly set or remains 'inbox'
+                    // Check if status is being updated
+                    var stat = el.querySelector('.fix-status');
+                    var statusValue = stat ? stat.value : '';
+
+                    if ((type.value === 'project' || type.value === 'folder') && (!statusValue || statusValue === 'inbox')) {
+                        u.status = 'active';
+                    }
+                }
 
                 // Project
                 var proj = el.querySelector('.fix-project');
