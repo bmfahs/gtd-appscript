@@ -115,14 +115,33 @@ function initializeSystem() {
 function getAllData() {
   Logger.log('getAllData() called');
   try {
+    // Optimization: Read Tasks sheet once for both Tasks and Projects
+    // And filter out 'done' items to reduce payload size
+    const allItems = TaskService.getAllItems();
+    
+    // Filter Tasks (Type = Task or hidden/missing, and NOT Done)
+    const activeTasks = allItems.filter(function(t) {
+        return (t.type === TASK_TYPE.TASK || !t.type) && t.status !== STATUS.DONE;
+    });
+
+    // Filter Projects (Type = Project, and Status != 'completed' which maps to 'done' internally)
+    const activeProjectItems = allItems.filter(function(t) {
+        return t.type === TASK_TYPE.PROJECT && t.status !== STATUS.DONE;
+    });
+
+    // Map to Project objects
+    const projects = activeProjectItems.map(function(p) {
+        return ProjectService.taskToProject(p);
+    });
+
     const data = {
-      tasks: TaskService.getAllTasks(),
-      projects: ProjectService.getAllProjects(),
+      tasks: activeTasks,
+      projects: projects,
       contexts: ContextService.getAllContexts(),
       areas: AreaService.getAllAreas(),
       settings: getSettings()
     };
-    Logger.log('getAllData() success, returning data keys: ' + Object.keys(data).join(', '));
+    Logger.log('getAllData() optimized success. Tasks: ' + activeTasks.length + ', Projects: ' + projects.length);
     return data;
   } catch (e) {
     Logger.log('getAllData() error: ' + e.toString());
@@ -132,9 +151,10 @@ function getAllData() {
     try {
       Logger.log('Attempting to initialize system...');
       initializeSystem();
+      // On init, empty is fine
       const data = {
-        tasks: TaskService.getAllTasks(),
-        projects: ProjectService.getAllProjects(),
+        tasks: [],
+        projects: [],
         contexts: ContextService.getAllContexts(),
         areas: AreaService.getAllAreas(),
         settings: getSettings()
