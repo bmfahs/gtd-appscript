@@ -260,9 +260,24 @@ function updateTask(taskId, updates) {
 function updateTasks(updatesArray) {
   // updatesArray = [{ id: '...', updates: { ... } }]
   var results = [];
+  var errors = [];
   updatesArray.forEach(function(u) {
-    results.push(TaskService.updateTask(u.id, u.updates));
+    try {
+      var res = TaskService.updateTask(u.id, u.updates);
+      if (!res.success) {
+        errors.push('Task ' + u.id + ': ' + res.error);
+      }
+      results.push(res);
+    } catch (e) {
+      Logger.log('Error updating task ' + u.id + ': ' + e.toString());
+      errors.push('Task ' + u.id + ': ' + e.toString());
+    }
   });
+  
+  if (errors.length > 0) {
+    return { success: false, error: errors.join('; '), count: results.length };
+  }
+  
   return { success: true, count: results.length };
 }
 

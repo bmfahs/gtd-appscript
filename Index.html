@@ -883,7 +883,7 @@
             <main class="content" id="content">
                 <div class="loading" id="loading">
                     <span class="material-icons spinning">refresh</span>
-                    <p>Loading...</p>
+                    <p id="loading-text">Loading...</p>
                 </div>
                 <div id="pageContent"></div>
             </main>
@@ -2519,46 +2519,56 @@
 
             items.forEach(function (el) {
                 var id = el.dataset.id;
-                var contextSelect = el.querySelector('.fix-context');
-                var timeInput = el.querySelector('.fix-time');
-                var statusSelect = el.querySelector('.fix-status');
-                var hasUpdates = false;
-                var u = {};
+                var original = state.tasks.find(function (t) { return t.id === id; });
+                if (!original) return;
 
-                if (contextSelect && contextSelect.value) {
+                var u = {};
+                var hasUpdates = false;
+
+                // Helper to compare values loosely (handle null/undefined vs empty string)
+                function isChanged(newVal, oldVal) {
+                    var n = newVal || '';
+                    var o = oldVal || '';
+                    return n !== o;
+                }
+
+                var contextSelect = el.querySelector('.fix-context');
+                if (contextSelect && isChanged(contextSelect.value, original.contextId)) {
                     u.contextId = contextSelect.value;
                     hasUpdates = true;
                 }
 
-                if (timeInput && timeInput.value) {
+                var timeInput = el.querySelector('.fix-time');
+                if (timeInput && isChanged(timeInput.value, original.timeEstimate)) {
                     u.timeEstimate = timeInput.value;
                     hasUpdates = true;
                 }
 
-                if (statusSelect && statusSelect.value) {
+                var statusSelect = el.querySelector('.fix-status');
+                if (statusSelect && isChanged(statusSelect.value, original.status)) {
                     u.status = statusSelect.value;
                     hasUpdates = true;
                 }
 
                 var typeSelect = el.querySelector('.fix-type');
-                if (typeSelect && typeSelect.value) {
+                if (typeSelect && isChanged(typeSelect.value, original.type)) {
                     u.type = typeSelect.value;
                     hasUpdates = true;
 
                     // Auto-set status to 'active' if converting to Project/Folder
-                    if ((u.type === 'project' || u.type === 'folder') && !u.status) {
+                    if ((u.type === 'project' || u.type === 'folder') && !u.status && original.status === 'inbox') {
                         u.status = 'active';
                     }
                 }
 
                 var scheduledInput = el.querySelector('.fix-scheduled');
-                if (scheduledInput && scheduledInput.value) {
+                if (scheduledInput && isChanged(scheduledInput.value, original.scheduledDate)) {
                     u.scheduledDate = scheduledInput.value;
                     hasUpdates = true;
                 }
 
                 var dueInput = el.querySelector('.fix-due');
-                if (dueInput && dueInput.value) {
+                if (dueInput && isChanged(dueInput.value, original.dueDate)) {
                     u.dueDate = dueInput.value;
                     hasUpdates = true;
                 }
@@ -2573,19 +2583,23 @@
                 return;
             }
 
-            showLoading(true);
-            google.script.run.withSuccessHandler(function (r) {
-                if (r.success) {
-                    showToast('Fixed ' + r.count + ' tasks');
-                    loadAllData();
-                } else {
-                    showToast('Error: ' + r.error);
-                    showLoading(false);
+            showLoading(true, 'Preparing updates...');
+
+            // Use chunking helper (batch size 5)
+            processUpdatesInChunks(updates, 5,
+                function (msg) {
+                    showLoading(true, msg);
+                },
+                function (result) {
+                    if (result.success) {
+                        showToast('Fixed ' + result.count + ' tasks');
+                        loadAllData();
+                    } else {
+                        showToast('Error: ' + result.error);
+                        showLoading(false);
+                    }
                 }
-            }).withFailureHandler(function (e) {
-                showToast('Error: ' + e);
-                showLoading(false);
-            }).updateTasks(updates);
+            );
         }
 
         function saveInboxUpdates() {
@@ -2675,28 +2689,59 @@
 
             items.forEach(function (el) {
                 var id = el.dataset.id;
+                var original = state.projects.find(function (p) { return p.id === id; });
+                if (!original) return;
+
                 var statusSelect = el.querySelector('.fix-status');
                 var scheduledInput = el.querySelector('.fix-scheduled');
+                var dueInput = el.querySelector('.fix-due');
 
                 var u = {};
                 var hasUpdates = false;
 
-                if (statusSelect && statusSelect.value) {
-                    u.status = statusSelect.value;
+                // Helper to compare values loosely
+                function isChanged(newVal, oldVal) {
+                    var n = newVal || '';
+                    var o = oldVal || '';
+                    // Project status mapping: 'completed' in UI might be 'done' in state if normalized?
+                    // ProjectService.taskToProject maps internal 'done' to 'completed'.
+                    // So state.projects have 'completed'.
+                    return n !== o;
+                }
+
+                if (statusSelect && isChanged(statusSelect.value, original.status)) {
+                    var val = statusSelect.value;
+                    // Internal mapping required? Backend expects 'done'?
+                    // ProjectService taskToProject maps 'done' -> 'completed'.
+                    // If we send 'completed', updateTasks checks?
+                    // TaskService.updateTask logic handles status. 
+                    // If we send 'completed', backend might store 'completed'.
+                    // But frontend expects 'completed'.
+                    // Let's persist logic: "if (u.status === 'completed') u.status = 'done';"
+                    // BUT wait, original logic was:
+                    // if (statusSelect && statusSelect.value) { u.status = statusSelect.value; if (u.status === 'completed') u.status = 'done'; ... }
+
+                    u.status = val;
                     if (u.status === 'completed') u.status = 'done';
+
+                    // Check if this normalized status is actually different from state?
+                    // State project has 'completed' (from taskToProject).
+                    // Input has 'completed'.
+                    // If input is 'completed', u.status becomes 'done'.
+                    // original.status is 'completed'.
+                    // 'completed' (input) == 'completed' (original). So NO change?
+                    // Wait. If I change from 'active' to 'completed'.
+                    // Input 'completed'. Original 'active'. Change detected.
+                    // u.status set to 'done'. Correct.
                     hasUpdates = true;
                 }
 
-                if (scheduledInput && scheduledInput.value) {
+                if (scheduledInput && isChanged(scheduledInput.value, original.scheduledDate)) {
                     u.scheduledDate = scheduledInput.value;
-                    // If scheduling into the future, maybe we should auto-set status to scheduled?
-                    // User only asked to edit the date. Let's stick to that unless explicit.
-                    // But if it's stalled active project, maybe they want it scheduled.
                     hasUpdates = true;
                 }
 
-                var dueInput = el.querySelector('.fix-due');
-                if (dueInput && dueInput.value) {
+                if (dueInput && isChanged(dueInput.value, original.dueDate)) {
                     u.dueDate = dueInput.value;
                     hasUpdates = true;
                 }
@@ -2711,16 +2756,23 @@
                 return;
             }
 
-            showLoading(true);
-            google.script.run.withSuccessHandler(function (r) {
-                if (r.success) {
-                    showToast('Updated ' + r.count + ' projects');
-                    loadAllData();
-                } else {
-                    showToast('Error: ' + r.error);
-                    showLoading(false);
+            showLoading(true, 'Preparing updates...');
+
+            // Use chunking helper (batch size 5)
+            processUpdatesInChunks(updates, 5,
+                function (msg) {
+                    showLoading(true, msg);
+                },
+                function (result) {
+                    if (result.success) {
+                        showToast('Updated ' + result.count + ' projects');
+                        loadAllData();
+                    } else {
+                        showToast('Error: ' + result.error);
+                        showLoading(false);
+                    }
                 }
-            }).updateTasks(updates);
+            );
         }
 
         function completeTaskClick(id) {
@@ -2754,7 +2806,69 @@
         function updateCurrentContext() { google.script.run.updateSetting('currentContext', document.getElementById('currentContext').value); }
         function updateCurrentEnergy() { google.script.run.updateSetting('currentEnergyLevel', document.getElementById('currentEnergy').value); }
 
-        function showLoading(s) { var l = document.getElementById('loading'); var c = document.getElementById('pageContent'); if (l) l.style.display = s ? 'flex' : 'none'; if (c) c.style.display = s ? 'none' : 'block'; }
+        function showLoading(s, msg) {
+            var l = document.getElementById('loading');
+            var c = document.getElementById('pageContent');
+            var t = document.getElementById('loading-text');
+            if (l) l.style.display = s ? 'flex' : 'none';
+            if (c) c.style.display = s ? 'none' : 'block';
+            if (t) t.textContent = msg || 'Loading...';
+        }
+
+        /**
+         * Process updates in chunks to prevent timeout and show progress
+         */
+        function processUpdatesInChunks(updates, batchSize, onProgress, onComplete) {
+            if (updates.length === 0) {
+                onComplete({ success: true, count: 0 });
+                return;
+            }
+
+            var total = updates.length;
+            var processed = 0;
+            var successes = 0;
+            var errors = [];
+            var chunks = [];
+
+            // Split into chunks
+            for (var i = 0; i < total; i += batchSize) {
+                chunks.push(updates.slice(i, i + batchSize));
+            }
+
+            function processNextChunk(chunkIndex) {
+                if (chunkIndex >= chunks.length) {
+                    onComplete({
+                        success: errors.length === 0,
+                        count: successes,
+                        error: errors.join('; ')
+                    });
+                    return;
+                }
+
+                var chunk = chunks[chunkIndex];
+                var currentBatchStart = chunkIndex * batchSize + 1;
+                var currentBatchEnd = Math.min((chunkIndex + 1) * batchSize, total);
+
+                onProgress('Processing items ' + currentBatchStart + ' - ' + currentBatchEnd + ' of ' + total + '...');
+
+                google.script.run.withSuccessHandler(function (r) {
+                    if (r.success) {
+                        successes += r.count;
+                    } else {
+                        errors.push(r.error);
+                    }
+                    processed += chunk.length;
+                    processNextChunk(chunkIndex + 1);
+                }).withFailureHandler(function (e) {
+                    errors.push('Batch failed: ' + e);
+                    processed += chunk.length;
+                    processNextChunk(chunkIndex + 1);
+                }).updateTasks(chunk);
+            }
+
+            // Start processing
+            processNextChunk(0);
+        }
         function showToast(m) { var t = document.getElementById('toast'); if (!t) return; t.textContent = m; t.classList.add('show'); setTimeout(function () { t.classList.remove('show'); }, 3000); }
         function esc(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
         function addContext() { var n = prompt('Context name:'); if (!n) return; var i = prompt('Emoji:', '📋'); google.script.run.withSuccessHandler(function (c) { state.contexts.push(c); populateSelects(); renderPage('contexts'); showToast('Added'); }).withFailureHandler(function (e) { showToast('Error: ' + e); }).createContext({ name: n, icon: i || '📋' }); }
