@@ -2525,7 +2525,7 @@
                 var u = {};
                 var hasUpdates = false;
 
-                // Helper to compare values loosely (handle null/undefined vs empty string)
+                // Helper to compare values loosely
                 function isChanged(newVal, oldVal) {
                     var n = newVal || '';
                     var o = oldVal || '';
@@ -2533,41 +2533,49 @@
                 }
 
                 var contextSelect = el.querySelector('.fix-context');
-                if (contextSelect && isChanged(contextSelect.value, original.contextId)) {
+                // Context is a "Command" input (starts empty). Only update if user selected something different.
+                if (contextSelect && contextSelect.value && contextSelect.value !== (original.contextId || '')) {
                     u.contextId = contextSelect.value;
                     hasUpdates = true;
                 }
 
                 var timeInput = el.querySelector('.fix-time');
-                if (timeInput && isChanged(timeInput.value, original.timeEstimate)) {
+                // Time is a "Command" input (starts empty). Only update if user entered something.
+                if (timeInput && timeInput.value && timeInput.value != (original.timeEstimate || '')) {
                     u.timeEstimate = timeInput.value;
                     hasUpdates = true;
                 }
 
                 var statusSelect = el.querySelector('.fix-status');
-                if (statusSelect && isChanged(statusSelect.value, original.status)) {
+                // Status is a "Command" input (starts empty). Only update if selected.
+                if (statusSelect && statusSelect.value && statusSelect.value !== (original.status || '')) {
                     u.status = statusSelect.value;
                     hasUpdates = true;
                 }
 
                 var typeSelect = el.querySelector('.fix-type');
-                if (typeSelect && isChanged(typeSelect.value, original.type)) {
+                // Type is a "State" input (pre-filled). Compare current vs original.
+                // Normalize original type: undefined/'task' are equivalent.
+                var originalType = original.type || 'task';
+                if (typeSelect && typeSelect.value !== originalType) {
                     u.type = typeSelect.value;
                     hasUpdates = true;
 
-                    // Auto-set status to 'active' if converting to Project/Folder
+                    // Auto-set status to 'active' if converting to Project/Folder and status is not explicitly set or remains 'inbox'
                     if ((u.type === 'project' || u.type === 'folder') && !u.status && original.status === 'inbox') {
                         u.status = 'active';
                     }
                 }
 
                 var scheduledInput = el.querySelector('.fix-scheduled');
+                // Date is a "State" input (pre-filled). Compare.
                 if (scheduledInput && isChanged(scheduledInput.value, original.scheduledDate)) {
                     u.scheduledDate = scheduledInput.value;
                     hasUpdates = true;
                 }
 
                 var dueInput = el.querySelector('.fix-due');
+                // Date is a "State" input (pre-filled). Compare.
                 if (dueInput && isChanged(dueInput.value, original.dueDate)) {
                     u.dueDate = dueInput.value;
                     hasUpdates = true;
@@ -2709,30 +2717,10 @@
                     return n !== o;
                 }
 
-                if (statusSelect && isChanged(statusSelect.value, original.status)) {
+                if (statusSelect && statusSelect.value && isChanged(statusSelect.value, original.status)) {
                     var val = statusSelect.value;
-                    // Internal mapping required? Backend expects 'done'?
-                    // ProjectService taskToProject maps 'done' -> 'completed'.
-                    // If we send 'completed', updateTasks checks?
-                    // TaskService.updateTask logic handles status. 
-                    // If we send 'completed', backend might store 'completed'.
-                    // But frontend expects 'completed'.
-                    // Let's persist logic: "if (u.status === 'completed') u.status = 'done';"
-                    // BUT wait, original logic was:
-                    // if (statusSelect && statusSelect.value) { u.status = statusSelect.value; if (u.status === 'completed') u.status = 'done'; ... }
-
                     u.status = val;
                     if (u.status === 'completed') u.status = 'done';
-
-                    // Check if this normalized status is actually different from state?
-                    // State project has 'completed' (from taskToProject).
-                    // Input has 'completed'.
-                    // If input is 'completed', u.status becomes 'done'.
-                    // original.status is 'completed'.
-                    // 'completed' (input) == 'completed' (original). So NO change?
-                    // Wait. If I change from 'active' to 'completed'.
-                    // Input 'completed'. Original 'active'. Change detected.
-                    // u.status set to 'done'. Correct.
                     hasUpdates = true;
                 }
 
