@@ -1080,20 +1080,29 @@
                 return p.status === 'active' && (!p.type || p.type === 'project');
             });
             activeProjects.forEach(function (p) {
-                // Check 1: Has visible next actions?
+                // Check 1: Has incomplete sub-tasks?
+                // User Request: Exclude if has "incomplete sub tasks". 
+                // Previously only checked 'next'. Now check any status implying incomplete work.
+                // Statuses: inbox, next, waiting, scheduled, someday.
+                // Exclude: done, deleted, reference(?).
                 var projectTasks = state.tasks.filter(function (t) {
                     return (t.projectId === p.id || t.parentTaskId === p.id) &&
-                        t.status === 'next';
+                        t.status !== 'done' &&
+                        t.status !== 'deleted' &&
+                        t.status !== 'reference';
                 });
 
-                if (projectTasks.length > 0) return; // Has next actions, so not stalled
+                if (projectTasks.length > 0) return; // Has incomplete tasks (active, waiting, scheduled, etc.), so not stalled
 
-                // Check 2: Has active sub-projects?
+                // Check 2: Has incomplete sub-projects?
+                // Previously only checked 'active'. Now check any non-completed/non-dropped.
                 var childProjects = state.projects.filter(function (cp) {
-                    return cp.parentProjectId === p.id && cp.status === 'active';
+                    return cp.parentProjectId === p.id &&
+                        cp.status !== 'completed' &&
+                        cp.status !== 'dropped';
                 });
 
-                if (childProjects.length > 0) return; // Has active sub-projects, so not stalled
+                if (childProjects.length > 0) return; // Has incomplete sub-projects, so not stalled
 
                 // Check 3: Is scheduled for the future?
                 if (p.scheduledDate) {
