@@ -1,242 +1,138 @@
 /**
  * GTD System - Priority Service
- * Implements the 7-factor priority algorithm
+ * Implements MLO-style Computed Score Algorithm
+ * Score = (Importance * Urgency) + StarBonus + Modifiers
  */
 
 const PriorityService = {
   
   /**
-   * Calculate priority score for a task
-   * Returns a score from 0-100
+   * Calculate priority score for a task (MLO Style)
+   * Returns a float score (Higher = Top of list)
    */
   calculatePriority: function(task, settings) {
     if (!settings) {
       settings = getSettings();
     }
     
-    let score = 0;
+    // 1. START DATE CHECK (The Gatekeeper)
+    // If Scheduled start date is in the future, priority is effectively zero/hidden
+    if (task.scheduledDate) {
+      const start = parseDate(task.scheduledDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (start > today) {
+        return 0.1; // "Future" status, very low priority but not invisible
+      }
+    }
+
+    // 2. BASE METRICS
+    // Default to Low/Normal if unset to avoid zero-multiplication issues
+    // Importance: 1 (Min) to 5 (Max)
+    let imp = task.importance ? parseInt(task.importance) : 2; 
     
-    // Factor 1: Due Date Proximity (0-20 points)
-    score += this.calculateDueDateScore(task.dueDate);
+    // Urgency: 1 (Min) to 5 (Max)
+    let urg = task.urgency ? parseInt(task.urgency) : 2;
+
+    // 3. DUE DATE MODIFIER (Increases Urgency)
+    // If due date is approaching, Urgency skyrockets
+    if (task.dueDate) {
+      const dueScore = this.calculateDueDateMultiplier(task.dueDate);
+      urg = urg * dueScore; // MLO behavior: Due date amplifies urgency
+    }
+
+    // 4. COMPUTED BASE SCORE
+    // Importance * Urgency
+    let computedScore = (imp * 10) * (urg * 10); // Scale up for visibility
+
+    // 5. STAR BONUS (Top of Pile)
+    if (task.isStarred) {
+      computedScore += PRIORITY_WEIGHTS.STAR_BONUS;
+    }
+
+    // 6. CONTEXTUAL MODIFIERS (Additive Bonuses)
     
-    // Factor 2: Project Importance (0-15 points)
-    score += this.calculateProjectScore(task.projectId);
+    // Context Match
+    if (task.contextId && settings.currentContext && task.contextId === settings.currentContext) {
+      computedScore += 50; // Significant boost for context match
+    }
+
+    // Energy Match
+    if (task.energyRequired && settings.currentEnergyLevel) {
+       if (task.energyRequired === settings.currentEnergyLevel) computedScore += 20;
+       // Lower energy requirement than available is also good
+       else if (settings.currentEnergyLevel === 'high' && task.energyRequired !== 'high') computedScore += 10;
+    }
+
+    // Age Bonus (Anti-Stagnation)
+    if (task.createdDate) {
+        computedScore += this.calculateAgeScore(task.createdDate);
+    }
     
-    // Factor 3: Context Match (0-15 points)
-    score += this.calculateContextScore(task.contextId, settings.currentContext);
-    
-    // Factor 4: Energy Match (0-10 points)
-    score += this.calculateEnergyScore(task.energyRequired, settings.currentEnergyLevel);
-    
-    // Factor 5: Time Available (0-10 points)
-    score += this.calculateTimeScore(task.timeEstimate, settings.availableMinutes);
-    
-    // Factor 6: Age (0-15 points)
-    score += this.calculateAgeScore(task.createdDate);
-    
-    // Factor 7: Dependencies (0-15 points)
-    score += this.calculateDependencyScore(task.id);
-    
-    return Math.round(score);
+    return parseFloat(computedScore.toFixed(2));
   },
   
   /**
-   * Factor 1: Due Date Proximity
-   * Closer due dates = higher score
+   * Calculate multiplier based on Due Date proximity
+   * Returns 1.0 (far), increasing to 3.0+ (overdue)
    */
-  calculateDueDateScore: function(dueDate) {
-    if (!dueDate) return 0;
+  calculateDueDateMultiplier: function(dueDate) {
+    if (!dueDate) return 1.0;
     
     const due = parseDate(dueDate);
-    const todayDate = new Date();
-    todayDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    const daysUntilDue = Math.ceil((due - todayDate) / (1000 * 60 * 60 * 24));
+    const diffTime = due - today;
+    const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    // Overdue items get maximum points
-    if (daysUntilDue < 0) return PRIORITY_WEIGHTS.DUE_DATE;
+    // Overdue: Extreme urgency
+    if (daysUntilDue < 0) return 4.0 + (Math.abs(daysUntilDue) * 0.1);
     
-    // Due today
-    if (daysUntilDue === 0) return PRIORITY_WEIGHTS.DUE_DATE;
+    // Due Today: Very High
+    if (daysUntilDue === 0) return 3.0;
     
-    // Due tomorrow
-    if (daysUntilDue === 1) return PRIORITY_WEIGHTS.DUE_DATE * 0.9;
+    // Due Tomorrow
+    if (daysUntilDue === 1) return 2.0;
     
-    // Due this week
-    if (daysUntilDue <= 7) return PRIORITY_WEIGHTS.DUE_DATE * 0.7;
+    // Due this week (Linear scaling from 1.5 to 1.1)
+    if (daysUntilDue <= 7) return 1.5;
     
-    // Due this month
-    if (daysUntilDue <= 30) return PRIORITY_WEIGHTS.DUE_DATE * 0.4;
-    
-    // Due later
-    return PRIORITY_WEIGHTS.DUE_DATE * 0.1;
+    return 1.0;
   },
-  
+
   /**
-   * Factor 2: Project Importance
-   * Based on project due date and active status
-   */
-  calculateProjectScore: function(projectId) {
-    if (!projectId) return 0;
-    
-    const project = ProjectService.getProject(projectId);
-    if (!project) return 0;
-    
-    let score = 0;
-    
-    // Active projects get base points
-    if (project.status === PROJECT_STATUS.ACTIVE) {
-      score += PRIORITY_WEIGHTS.PROJECT_IMPORTANCE * 0.5;
-    }
-    
-    // Project with due date gets more points
-    if (project.dueDate) {
-      const dueDateScore = this.calculateDueDateScore(project.dueDate);
-      score += (dueDateScore / PRIORITY_WEIGHTS.DUE_DATE) * (PRIORITY_WEIGHTS.PROJECT_IMPORTANCE * 0.5);
-    }
-    
-    return score;
-  },
-  
-  /**
-   * Factor 3: Context Match
-   * Tasks matching current context score higher
-   */
-  calculateContextScore: function(taskContextId, currentContextId) {
-    if (!taskContextId || !currentContextId) {
-      // No context set = available anywhere, moderate score
-      return PRIORITY_WEIGHTS.CONTEXT_MATCH * 0.5;
-    }
-    
-    if (taskContextId === currentContextId) {
-      return PRIORITY_WEIGHTS.CONTEXT_MATCH;
-    }
-    
-    return 0;
-  },
-  
-  /**
-   * Factor 4: Energy Match
-   * Tasks matching current energy level score higher
-   */
-  calculateEnergyScore: function(taskEnergy, currentEnergy) {
-    if (!taskEnergy || !currentEnergy) {
-      return PRIORITY_WEIGHTS.ENERGY_MATCH * 0.5;
-    }
-    
-    const energyLevels = { low: 1, medium: 2, high: 3 };
-    const taskLevel = energyLevels[taskEnergy] || 2;
-    const currentLevel = energyLevels[currentEnergy] || 2;
-    
-    // Perfect match
-    if (taskLevel === currentLevel) {
-      return PRIORITY_WEIGHTS.ENERGY_MATCH;
-    }
-    
-    // Task requires less energy than available = good
-    if (taskLevel < currentLevel) {
-      return PRIORITY_WEIGHTS.ENERGY_MATCH * 0.7;
-    }
-    
-    // Task requires more energy than available = less ideal
-    return PRIORITY_WEIGHTS.ENERGY_MATCH * 0.3;
-  },
-  
-  /**
-   * Factor 5: Time Available
-   * Tasks that fit in available time score higher
-   */
-  calculateTimeScore: function(timeEstimate, availableMinutes) {
-    if (!timeEstimate || !availableMinutes) {
-      return PRIORITY_WEIGHTS.TIME_AVAILABLE * 0.5;
-    }
-    
-    const estimate = parseInt(timeEstimate) || 30;
-    const available = parseInt(availableMinutes) || 60;
-    
-    // Task fits perfectly (within 20% of available time)
-    if (estimate >= available * 0.8 && estimate <= available) {
-      return PRIORITY_WEIGHTS.TIME_AVAILABLE;
-    }
-    
-    // Task fits with time to spare
-    if (estimate < available) {
-      return PRIORITY_WEIGHTS.TIME_AVAILABLE * 0.8;
-    }
-    
-    // Task doesn't fit
-    return PRIORITY_WEIGHTS.TIME_AVAILABLE * 0.2;
-  },
-  
-  /**
-   * Factor 6: Age
-   * Older incomplete tasks get higher priority to prevent stagnation
+   * Minor bonus for older tasks
    */
   calculateAgeScore: function(createdDate) {
     if (!createdDate) return 0;
-    
     const created = parseDate(createdDate);
     const now = new Date();
     const daysOld = Math.floor((now - created) / (1000 * 60 * 60 * 24));
     
-    // Less than a day old
-    if (daysOld < 1) return 0;
-    
-    // 1-3 days old
-    if (daysOld <= 3) return PRIORITY_WEIGHTS.AGE * 0.2;
-    
-    // 4-7 days old
-    if (daysOld <= 7) return PRIORITY_WEIGHTS.AGE * 0.4;
-    
-    // 1-2 weeks old
-    if (daysOld <= 14) return PRIORITY_WEIGHTS.AGE * 0.6;
-    
-    // 2-4 weeks old
-    if (daysOld <= 28) return PRIORITY_WEIGHTS.AGE * 0.8;
-    
-    // More than a month old
-    return PRIORITY_WEIGHTS.AGE;
+    // Cap at 15 points
+    return Math.min(daysOld * 0.5, 15);
   },
   
   /**
-   * Factor 7: Dependencies
-   * Tasks that block other tasks get higher priority
+   * Dependency check (Stubbed for performance)
    */
   calculateDependencyScore: function(taskId) {
-    // OPTIMIZATION: Skipping dependency check for now to prevent performance hangs
-    return 0;
-    /*
-    const allTasks = TaskService.getAllTasks();
-    const dependentTasks = allTasks.filter(t => 
-      t.parentTaskId === taskId && 
-      t.status !== STATUS.DONE && 
-      t.status !== STATUS.DELETED
-    );
-    
-    const count = dependentTasks.length;
-    
-    if (count === 0) return 0;
-    if (count === 1) return PRIORITY_WEIGHTS.DEPENDENCIES * 0.3;
-    if (count <= 3) return PRIORITY_WEIGHTS.DEPENDENCIES * 0.6;
-    
-    return PRIORITY_WEIGHTS.DEPENDENCIES;
-    */
+    return 0; 
   },
   
   /**
    * Get priority label for display
+   * Adjusted for new scoring scale (0-1000+)
    */
   getPriorityLabel: function(score) {
-    if (score >= 80) return { label: 'Critical', class: 'priority-critical' };
-    if (score >= 60) return { label: 'High', class: 'priority-high' };
-    if (score >= 40) return { label: 'Medium', class: 'priority-medium' };
-    if (score >= 20) return { label: 'Low', class: 'priority-low' };
-    return { label: 'None', class: 'priority-none' };
+    if (score >= 400) return { label: 'Critical', class: 'priority-critical' }; // Star + High/High
+    if (score >= 200) return { label: 'High', class: 'priority-high' };         // High/High or Star/Low
+    if (score >= 100) return { label: 'Medium', class: 'priority-medium' };     // Normal
+    return { label: 'Low', class: 'priority-low' };
   },
   
-  /**
-   * Update context and energy settings (for priority recalculation)
-   */
+  // Settings updates trigger recalculation
   updateCurrentContext: function(contextId) {
     updateSetting('currentContext', contextId);
     TaskService.recalculateAllPriorities();

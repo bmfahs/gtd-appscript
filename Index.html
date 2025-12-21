@@ -958,7 +958,13 @@
             onclick="if(event.target === this) closeItemDialog()">
             <div class="dialog">
                 <div class="dialog-header">
-                    <h2 id="itemDialogTitle">Edit Item</h2>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <h2 id="itemDialogTitle">Edit Item</h2>
+                        <button class="btn-icon" id="itemStarBtn" onclick="toggleItemStar()"
+                            style="color:var(--text-muted);">
+                            <span class="material-icons" id="itemStarIcon">star_border</span>
+                        </button>
+                    </div>
                     <button class="btn-icon" onclick="closeItemDialog()"><span
                             class="material-icons">close</span></button>
                 </div>
@@ -1016,65 +1022,86 @@
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="itemEnergy">Energy</label>
-                                <select id="itemEnergy" class="form-control">
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
+                                <label for="itemImportance">Importance</label>
+                                <select id="itemImportance" class="form-control">
+                                    <option value="1">Low</option>
+                                    <option value="2">Normal</option>
+                                    <option value="3">High</option>
+                                    <option value="4">Top</option>
                                 </select>
                             </div>
-                            <div class="form-group" id="itemWaitingForGroup" style="display:none">
-                                <label for="itemWaitingFor">Waiting For (Who?)</label>
-                                <input type="text" id="itemWaitingFor" class="form-control">
+                            <div class="form-group">
+                                <label for="itemUrgency">Urgency</label>
+                                <select id="itemUrgency" class="form-control">
+                                    <option value="1">Low</option>
+                                    <option value="2">Normal</option>
+                                    <option value="3">High</option>
+                                    <option value="4">Critical</option>
+                                </select>
                             </div>
                         </div>
-                    </div>
+                        <div class="form-row">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="itemEnergy">Energy</label>
+                                    <select id="itemEnergy" class="form-control">
+                                        <option value="low">Low</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="high">High</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" id="itemWaitingForGroup" style="display:none">
+                                    <label for="itemWaitingFor">Waiting For (Who?)</label>
+                                    <input type="text" id="itemWaitingFor" class="form-control">
+                                </div>
+                            </div>
+                        </div>
 
-                    <!-- Project/Folder Specific Fields -->
-                    <div id="projectFields" style="display:none">
+                        <!-- Project/Folder Specific Fields -->
+                        <div id="projectFields" style="display:none">
+                            <div class="form-group">
+                                <label for="itemArea">Area</label>
+                                <select id="itemArea" class="form-control"></select>
+                            </div>
+                        </div>
+
+                        <!-- Common Date Fields -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="itemDueDate">Due Date</label>
+                                <input type="date" id="itemDueDate" class="form-control">
+                            </div>
+                            <div class="form-group" id="scheduledDateGroup" style="display:none">
+                                <label for="itemScheduledDate">Scheduled Date</label>
+                                <input type="date" id="itemScheduledDate" class="form-control">
+                            </div>
+                        </div>
+
                         <div class="form-group">
-                            <label for="itemArea">Area</label>
-                            <select id="itemArea" class="form-control"></select>
+                            <label for="itemNotes">Notes</label>
+                            <textarea id="itemNotes" class="form-control" rows="4"></textarea>
                         </div>
-                    </div>
 
-                    <!-- Common Date Fields -->
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="itemDueDate">Due Date</label>
-                            <input type="date" id="itemDueDate" class="form-control">
+                        <div class="form-group" id="emailLink" style="display: none;">
+                            <a href="#" id="emailLinkAnchor" class="email-link" target="_blank">
+                                <span class="material-icons">mail</span> Open in Gmail
+                            </a>
                         </div>
-                        <div class="form-group" id="scheduledDateGroup" style="display:none">
-                            <label for="itemScheduledDate">Scheduled Date</label>
-                            <input type="date" id="itemScheduledDate" class="form-control">
+
+                    </div>
+                    <div class="dialog-footer">
+                        <button type="button" class="btn btn-danger" id="deleteItemBtn" onclick="deleteCurrentItem()"
+                            style="display: none;">
+                            <span class="material-icons" style="font-size: 18px;">delete</span>
+                        </button>
+                        <div class="dialog-footer-right">
+                            <button type="button" class="btn btn-secondary" onclick="closeItemDialog()">Cancel</button>
+                            <button type="button" class="btn btn-primary" onclick="saveItem()">Save</button>
                         </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="itemNotes">Notes</label>
-                        <textarea id="itemNotes" class="form-control" rows="4"></textarea>
-                    </div>
-
-                    <div class="form-group" id="emailLink" style="display: none;">
-                        <a href="#" id="emailLinkAnchor" class="email-link" target="_blank">
-                            <span class="material-icons">mail</span> Open in Gmail
-                        </a>
-                    </div>
-
-                </div>
-                <div class="dialog-footer">
-                    <button type="button" class="btn btn-danger" id="deleteItemBtn" onclick="deleteCurrentItem()"
-                        style="display: none;">
-                        <span class="material-icons" style="font-size: 18px;">delete</span>
-                    </button>
-                    <div class="dialog-footer-right">
-                        <button type="button" class="btn btn-secondary" onclick="closeItemDialog()">Cancel</button>
-                        <button type="button" class="btn btn-primary" onclick="saveItem()">Save</button>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
     </div>
     <div id="toast" class="toast"></div>
     </div>
@@ -1187,7 +1214,10 @@
                 // if (!t.timeEstimate) issues.push('No Time'); // Time is optional? User said "don't have a time estimate"
 
                 // Let's be strict as requested
+                // Let's be strict as requested
                 if (!t.timeEstimate) issues.push('No Time Est.');
+                if (!t.importance) issues.push('No Importance');
+                if (!t.urgency) issues.push('No Urgency');
 
                 // Filter: If scheduled date is in the future, ignore
                 var isFutureScheduled = false;
@@ -1305,7 +1335,30 @@
                     h += '<option value="deleted">Delete</option>';
                     h += '</select>';
 
-                    // Scheduled (Always show)
+                    // Importance (Condition: Missing or just always show in fix mode?)
+                    // Show if missing
+                    if (item.issues.indexOf('No Importance') !== -1) {
+                        h += '<select class="form-control fix-importance" style="width:70px; padding:4px; font-size:12px; border-color:var(--danger);" onclick="event.stopPropagation()">';
+                        h += '<option value="">Imp...</option>';
+                        ['1', '2', '3', '4'].forEach(v => {
+                            var l = { 1: 'Low', 2: 'Nrm', 3: 'Hi', 4: 'Top' }[v];
+                            h += '<option value="' + v + '">' + l + '</option>';
+                        });
+                        h += '</select>';
+                    }
+
+                    // Urgency
+                    if (item.issues.indexOf('No Urgency') !== -1) {
+                        h += '<select class="form-control fix-urgency" style="width:70px; padding:4px; font-size:12px; border-color:var(--danger);" onclick="event.stopPropagation()">';
+                        h += '<option value="">Urg...</option>';
+                        ['1', '2', '3', '4'].forEach(v => {
+                            var l = { 1: 'Low', 2: 'Nrm', 3: 'Hi', 4: 'Crt' }[v];
+                            h += '<option value="' + v + '">' + l + '</option>';
+                        });
+                        h += '</select>';
+                    }
+
+                    // Scheduled (Always show to allow deferring)
                     h += '<span style="font-size:10px; color:var(--text-muted); margin-left:8px; margin-right:2px;">Sched:</span>';
                     h += '<input type="date" class="form-control fix-scheduled" value="' + (t.scheduledDate || '') + '" style="width:110px; padding:3px; font-size:12px;" onclick="event.stopPropagation()">';
 
@@ -1569,7 +1622,13 @@
             var h = '<div class="task-item fix-item" data-id="' + t.id + '" style="flex-direction:column; align-items:stretch; gap:8px; cursor:default;">';
 
             // Top: Title (Click to open dialog still works?) -> Let's make title clickable
-            h += '<div class="task-title" onclick="openItemDialog(\'' + t.id + '\')" style="cursor:pointer; font-weight:600; color:var(--primary);">' + esc(t.title) + '</div>';
+            // Top: Title (Click to open dialog still works?) -> Let's make title clickable + Star
+            h += '<div style="display:flex; align-items:center; gap:8px;">';
+            var starIcon = t.isStarred ? 'star' : 'star_border';
+            var starColor = t.isStarred ? '#f59e0b' : 'var(--text-muted)';
+            h += '<span class="material-icons fix-star" onclick="event.stopPropagation(); toggleBulkStar(this)" style="cursor:pointer; color:' + starColor + '; font-size:18px;" data-starred="' + (t.isStarred || 'false') + '">' + starIcon + '</span>';
+            h += '<div class="task-title" onclick="openItemDialog(\'' + t.id + '\')" style="cursor:pointer; font-weight:600; color:var(--primary); flex:1;">' + esc(t.title) + '</div>';
+            h += '</div> top-row-end'; // end flex container
 
             // Middle: Project & Context & Status
             h += '<div style="display:flex; gap:8px; flex-wrap:wrap;">';
@@ -1599,12 +1658,29 @@
             });
             h += '</select>';
 
-            // Status Selector
             h += '<select class="form-control fix-status" style="width:100px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
             var statuses = ['inbox', 'next', 'waiting', 'scheduled', 'someday', 'done', 'deleted'];
             statuses.forEach(function (s) {
                 var sel = (t.status === s) ? 'selected' : '';
                 h += '<option value="' + s + '" ' + sel + '>' + s.charAt(0).toUpperCase() + s.slice(1) + '</option>';
+            });
+            h += '</select>';
+
+            // Importance
+            h += '<select class="form-control fix-importance" style="width:70px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            ['1', '2', '3', '4'].forEach(v => {
+                var l = { 1: 'Low', 2: 'Nrm', 3: 'Hi', 4: 'Top' }[v];
+                var sel = (t.importance == v || (!t.importance && v == 2)) ? 'selected' : '';
+                h += '<option value="' + v + '" ' + sel + '>' + l + '</option>';
+            });
+            h += '</select>';
+
+            // Urgency
+            h += '<select class="form-control fix-urgency" style="width:70px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            ['1', '2', '3', '4'].forEach(v => {
+                var l = { 1: 'Low', 2: 'Nrm', 3: 'Hi', 4: 'Crt' }[v];
+                var sel = (t.urgency == v || (!t.urgency && v == 2)) ? 'selected' : '';
+                h += '<option value="' + v + '" ' + sel + '>' + l + '</option>';
             });
             h += '</select>';
 
@@ -2211,6 +2287,21 @@
                 document.getElementById('itemEnergy').value = item.energyRequired || 'medium';
                 document.getElementById('itemTimeEstimate').value = item.timeEstimate || '';
                 document.getElementById('itemWaitingFor').value = item.waitingFor || '';
+                document.getElementById('itemImportance').value = item.importance || '2';
+                document.getElementById('itemUrgency').value = item.urgency || '2';
+
+                // Star rendering
+                var starBtn = document.getElementById('itemStarBtn');
+                var starIcon = document.getElementById('itemStarIcon');
+                if (item.isStarred) {
+                    starIcon.textContent = 'star';
+                    starBtn.style.color = '#f59e0b'; // Amber-500
+                    starBtn.dataset.starred = "true";
+                } else {
+                    starIcon.textContent = 'star_border';
+                    starBtn.style.color = 'var(--text-muted)';
+                    starBtn.dataset.starred = "false";
+                }
 
                 // Project specifics
                 document.getElementById('itemArea').value = item.areaId || '';
@@ -2248,7 +2339,17 @@
                 document.getElementById('itemContext').value = state.settings.defaultContext || '';
                 document.getElementById('itemEnergy').value = 'medium';
                 document.getElementById('itemTimeEstimate').value = '';
+                document.getElementById('itemTimeEstimate').value = '';
                 document.getElementById('itemWaitingFor').value = '';
+                document.getElementById('itemImportance').value = '2';
+                document.getElementById('itemUrgency').value = '2';
+
+                // Reset Star
+                var starBtn = document.getElementById('itemStarBtn');
+                var starIcon = document.getElementById('itemStarIcon');
+                starIcon.textContent = 'star_border';
+                starBtn.style.color = 'var(--text-muted)';
+                starBtn.dataset.starred = "false";
                 document.getElementById('itemArea').value = '';
                 document.getElementById('itemDueDate').value = '';
                 document.getElementById('itemScheduledDate').value = '';
@@ -2257,9 +2358,26 @@
                 document.getElementById('emailLink').style.display = 'none';
             }
 
-            // Common setup for both New and Edit
             updateDialogVisibility();
             setupParentDropdown();
+        }
+
+        function toggleItemStar() {
+            var btn = document.getElementById('itemStarBtn');
+            var icon = document.getElementById('itemStarIcon');
+            var isStarred = btn.dataset.starred === "true";
+
+            if (isStarred) {
+                // Turn off
+                btn.dataset.starred = "false";
+                icon.textContent = 'star_border';
+                btn.style.color = 'var(--text-muted)';
+            } else {
+                // Turn on
+                btn.dataset.starred = "true";
+                icon.textContent = 'star';
+                btn.style.color = '#f59e0b';
+            }
         }
 
         function updateDialogVisibility() {
@@ -2325,6 +2443,12 @@
                 d.energyRequired = document.getElementById('itemEnergy').value;
                 d.timeEstimate = document.getElementById('itemTimeEstimate').value;
                 d.waitingFor = document.getElementById('itemWaitingFor').value;
+                d.importance = document.getElementById('itemImportance').value;
+                d.urgency = document.getElementById('itemUrgency').value;
+
+                // Star collection
+                var starBtn = document.getElementById('itemStarBtn');
+                d.isStarred = (starBtn.dataset.starred === "true");
                 d.scheduledDate = document.getElementById('itemScheduledDate').value;
 
                 // Parent Mapping
@@ -2612,6 +2736,20 @@
                     hasUpdates = true;
                 }
 
+                // Importance (Command)
+                var impSelect = el.querySelector('.fix-importance');
+                if (impSelect && impSelect.value && impSelect.value !== (original.importance || '')) {
+                    u.importance = impSelect.value;
+                    hasUpdates = true;
+                }
+
+                // Urgency (Command)
+                var urgSelect = el.querySelector('.fix-urgency');
+                if (urgSelect && urgSelect.value && urgSelect.value !== (original.urgency || '')) {
+                    u.urgency = urgSelect.value;
+                    hasUpdates = true;
+                }
+
                 var typeSelect = el.querySelector('.fix-type');
                 // Type is a "State" input (pre-filled). Compare current vs original.
                 // Normalize original type: undefined/'task' are equivalent.
@@ -2725,6 +2863,26 @@
                 var energy = el.querySelector('.fix-energy');
                 if (energy && energy.value && energy.value !== 'medium') { u.energyRequired = energy.value; hasUpdates = true; }
 
+                // Importance
+                var imp = el.querySelector('.fix-importance');
+                if (imp && imp.value) { u.importance = imp.value; hasUpdates = true; }
+
+                // Urgency
+                var urg = el.querySelector('.fix-urgency');
+                if (urg && urg.value) { u.urgency = urg.value; hasUpdates = true; }
+
+                // Star
+                var star = el.querySelector('.fix-star');
+                if (star) {
+                    var isStarred = (star.dataset.starred === 'true');
+                    // Only update if strictly changed from original? 
+                    // Complexity: 'original' is not easily accessible here without lookup.
+                    // But we can check if it differs from default? No, just send it if true, or if likely changed.
+                    // Simplest: Send if present. Backend handles merging.
+                    u.isStarred = isStarred;
+                    hasUpdates = true;
+                }
+
                 if (hasUpdates) {
                     updates.push({ id: id, updates: u });
                 }
@@ -2748,6 +2906,19 @@
                 showToast('Error: ' + e);
                 showLoading(false);
             }).updateTasks(updates);
+        }
+
+        function toggleBulkStar(el) {
+            var isStarred = el.dataset.starred === 'true';
+            if (isStarred) {
+                el.dataset.starred = 'false';
+                el.innerText = 'star_border';
+                el.style.color = 'var(--text-muted)';
+            } else {
+                el.dataset.starred = 'true';
+                el.innerText = 'star';
+                el.style.color = '#f59e0b';
+            }
         }
 
         function saveProjectAttentionFixes() {

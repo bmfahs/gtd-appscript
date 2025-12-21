@@ -376,7 +376,10 @@ const TaskService = {
       parentTaskId: row[TASK_COLS.PARENT_TASK_ID] || '',
       sortOrder: row[TASK_COLS.SORT_ORDER] || 0,
       type: row[TASK_COLS.TYPE] || TASK_TYPE.TASK,
-      areaId: row[TASK_COLS.AREA_ID] || ''
+      areaId: row[TASK_COLS.AREA_ID] || '',
+      importance: row[TASK_COLS.IMPORTANCE] || '',
+      urgency: row[TASK_COLS.URGENCY] || '',
+      isStarred: row[TASK_COLS.IS_STARRED] === true || row[TASK_COLS.IS_STARRED] === 'true'
     };
   },
   
@@ -411,6 +414,9 @@ const TaskService = {
     row[TASK_COLS.SORT_ORDER] = task.sortOrder;
     row[TASK_COLS.TYPE] = task.type;
     row[TASK_COLS.AREA_ID] = task.areaId;
+    row[TASK_COLS.IMPORTANCE] = task.importance;
+    row[TASK_COLS.URGENCY] = task.urgency;
+    row[TASK_COLS.IS_STARRED] = task.isStarred;
     return row;
   }
 };
