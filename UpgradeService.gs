@@ -150,3 +150,10 @@ function runPhase1Migration() {
 function runPhase2ClearColumn() {
   return UpgradeService.clearProjectIdColumn();
 }
+
+/**
+ * Global wrapper to run Phase 3 (Delete Column)
+ */
+function runPhase3Deletion() {
+  return UpgradeService.deleteProjectIdColumn();
+}

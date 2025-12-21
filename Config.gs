@@ -57,29 +57,63 @@ const TASK_TYPE = {
 };
 
 // Column indices for Tasks sheet (0-based)
-const TASK_COLS = {
-  ID: 0,
-  TITLE: 1,
-  NOTES: 2,
-  STATUS: 3,
-  PROJECT_ID: 4, // DEPRECATED: Do not use. Use PARENT_TASK_ID (17) instead.
-  CONTEXT_ID: 5,
-  WAITING_FOR: 6,
-  DUE_DATE: 7,
-  SCHEDULED_DATE: 8,
-  COMPLETED_DATE: 9,
-  CREATED_DATE: 10,
-  MODIFIED_DATE: 11,
-  EMAIL_ID: 12,
-  EMAIL_THREAD_ID: 13,
-  PRIORITY: 14,
-  ENERGY_REQUIRED: 15,
-  TIME_ESTIMATE: 16,
-  PARENT_TASK_ID: 17,
-  SORT_ORDER: 18,
-  TYPE: 19,
-  AREA_ID: 20
-};
+// Column definition for Tasks sheet (used to generate indices)
+// Column definition for Tasks sheet (used to generate indices)
+// We detect if 'projectId' exists in the Sheet to determine which schema to use
+const TASK_COLUMN_ORDER = (function() {
+  const legacyOrder = [
+    'ID', 'TITLE', 'NOTES', 'STATUS',
+    'PROJECT_ID', // Legacy column
+    'CONTEXT_ID', 'WAITING_FOR', 'DUE_DATE', 'SCHEDULED_DATE',
+    'COMPLETED_DATE', 'CREATED_DATE', 'MODIFIED_DATE', 'EMAIL_ID',
+    'EMAIL_THREAD_ID', 'PRIORITY', 'ENERGY_REQUIRED', 'TIME_ESTIMATE',
+    'PARENT_TASK_ID', 'SORT_ORDER', 'TYPE', 'AREA_ID'
+  ];
+  
+  const newOrder = [
+    'ID', 'TITLE', 'NOTES', 'STATUS',
+    // PROJECT_ID Removed
+    'CONTEXT_ID', 'WAITING_FOR', 'DUE_DATE', 'SCHEDULED_DATE',
+    'COMPLETED_DATE', 'CREATED_DATE', 'MODIFIED_DATE', 'EMAIL_ID',
+    'EMAIL_THREAD_ID', 'PRIORITY', 'ENERGY_REQUIRED', 'TIME_ESTIMATE',
+    'PARENT_TASK_ID', 'SORT_ORDER', 'TYPE', 'AREA_ID'
+  ];
+  
+  try {
+    // Attempt to detect schema from actual Sheet
+    // Note: This runs every time the script loads.
+    // If we can't access the sheet (e.g. auth mode, error), fallback to Legacy (safest).
+    const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+    if (!sheetId) return legacyOrder;
+    
+    const ss = SpreadsheetApp.openById(sheetId);
+    const sheet = ss.getSheetByName('Tasks'); // Hardcoded name to avoid circ ref with SHEETS constant
+    if (!sheet) return legacyOrder;
+    
+    // Read only the header row (Row 1)
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // Check if 'projectId' column exists
+    const hasProjectId = headers.includes('projectId');
+    
+    return hasProjectId ? legacyOrder : newOrder;
+    
+  } catch (e) {
+    // If any error occurs (e.g. permission issues in simple triggers), fallback to legacy
+    Logger.log('Schema detection failed, using legacy: ' + e.toString());
+    return legacyOrder;
+  }
+})();
+
+// Generate indices dynamically
+const TASK_COLS = TASK_COLUMN_ORDER.reduce((acc, key, index) => {
+  acc[key] = index;
+  // If we are in New Order, we might want to map PROJECT_ID to something?
+  // No, code should check if TASK_COLS.PROJECT_ID is undefined if it wants to be robust,
+  // but our Refactor (Phase 1) ensures we don't start reading/writing PROJECT_ID column index directly 
+  // without reason. However, `row[TASK_COLS.PROJECT_ID]` will equal `row[undefined]` which is undefined. 
+  return acc;
+}, {});
 
 // Column indices for Projects sheet (0-based) (Legacy/Backup)
 const PROJECT_COLS = {
