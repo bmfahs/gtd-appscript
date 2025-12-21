@@ -1041,67 +1041,66 @@
                             </div>
                         </div>
                         <div class="form-row">
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="itemEnergy">Energy</label>
-                                    <select id="itemEnergy" class="form-control">
-                                        <option value="low">Low</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="high">High</option>
-                                    </select>
-                                </div>
-                                <div class="form-group" id="itemWaitingForGroup" style="display:none">
-                                    <label for="itemWaitingFor">Waiting For (Who?)</label>
-                                    <input type="text" id="itemWaitingFor" class="form-control">
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Project/Folder Specific Fields -->
-                        <div id="projectFields" style="display:none">
                             <div class="form-group">
-                                <label for="itemArea">Area</label>
-                                <select id="itemArea" class="form-control"></select>
+                                <label for="itemEnergy">Energy</label>
+                                <select id="itemEnergy" class="form-control">
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="itemWaitingForGroup" style="display:none">
+                                <label for="itemWaitingFor">Waiting For (Who?)</label>
+                                <input type="text" id="itemWaitingFor" class="form-control">
                             </div>
                         </div>
-
-                        <!-- Common Date Fields -->
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="itemDueDate">Due Date</label>
-                                <input type="date" id="itemDueDate" class="form-control">
-                            </div>
-                            <div class="form-group" id="scheduledDateGroup" style="display:none">
-                                <label for="itemScheduledDate">Scheduled Date</label>
-                                <input type="date" id="itemScheduledDate" class="form-control">
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="itemNotes">Notes</label>
-                            <textarea id="itemNotes" class="form-control" rows="4"></textarea>
-                        </div>
-
-                        <div class="form-group" id="emailLink" style="display: none;">
-                            <a href="#" id="emailLinkAnchor" class="email-link" target="_blank">
-                                <span class="material-icons">mail</span> Open in Gmail
-                            </a>
-                        </div>
-
                     </div>
-                    <div class="dialog-footer">
-                        <button type="button" class="btn btn-danger" id="deleteItemBtn" onclick="deleteCurrentItem()"
-                            style="display: none;">
-                            <span class="material-icons" style="font-size: 18px;">delete</span>
-                        </button>
-                        <div class="dialog-footer-right">
-                            <button type="button" class="btn btn-secondary" onclick="closeItemDialog()">Cancel</button>
-                            <button type="button" class="btn btn-primary" onclick="saveItem()">Save</button>
+
+                    <!-- Project/Folder Specific Fields -->
+                    <div id="projectFields" style="display:none">
+                        <div class="form-group">
+                            <label for="itemArea">Area</label>
+                            <select id="itemArea" class="form-control"></select>
                         </div>
+                    </div>
+
+                    <!-- Common Date Fields -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="itemDueDate">Due Date</label>
+                            <input type="date" id="itemDueDate" class="form-control">
+                        </div>
+                        <div class="form-group" id="scheduledDateGroup">
+                            <label for="itemScheduledDate">Scheduled Date</label>
+                            <input type="date" id="itemScheduledDate" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="itemNotes">Notes</label>
+                        <textarea id="itemNotes" class="form-control" rows="4"></textarea>
+                    </div>
+
+                    <div class="form-group" id="emailLink" style="display: none;">
+                        <a href="#" id="emailLinkAnchor" class="email-link" target="_blank">
+                            <span class="material-icons">mail</span> Open in Gmail
+                        </a>
+                    </div>
+
+                </div>
+                <div class="dialog-footer">
+                    <button type="button" class="btn btn-danger" id="deleteItemBtn" onclick="deleteCurrentItem()"
+                        style="display: none;">
+                        <span class="material-icons" style="font-size: 18px;">delete</span>
+                    </button>
+                    <div class="dialog-footer-right">
+                        <button type="button" class="btn btn-secondary" onclick="closeItemDialog()">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="saveItem()">Save</button>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
     </div>
     <div id="toast" class="toast"></div>
     </div>
@@ -1628,7 +1627,7 @@
             var starColor = t.isStarred ? '#f59e0b' : 'var(--text-muted)';
             h += '<span class="material-icons fix-star" onclick="event.stopPropagation(); toggleBulkStar(this)" style="cursor:pointer; color:' + starColor + '; font-size:18px;" data-starred="' + (t.isStarred || 'false') + '">' + starIcon + '</span>';
             h += '<div class="task-title" onclick="openItemDialog(\'' + t.id + '\')" style="cursor:pointer; font-weight:600; color:var(--primary); flex:1;">' + esc(t.title) + '</div>';
-            h += '</div> top-row-end'; // end flex container
+            h += '</div>'; // end flex container
 
             // Middle: Project & Context & Status
             h += '<div style="display:flex; gap:8px; flex-wrap:wrap;">';
@@ -2044,7 +2043,13 @@
         }
 
         function renderNext() {
-            var t = state.tasks.filter(function (x) { return x.status === 'next'; });
+            var now = new Date();
+            var today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+
+            var t = state.tasks.filter(function (x) {
+                var isFuture = x.scheduledDate && x.scheduledDate > today;
+                return x.status === 'next' && !isFuture;
+            });
 
             // Sort by Score Descending
             t.sort(function (a, b) {
@@ -2307,8 +2312,8 @@
                 document.getElementById('itemArea').value = item.areaId || '';
 
                 // Common
-                document.getElementById('itemDueDate').value = item.dueDate ? formatDateForInput(new Date(item.dueDate)) : '';
-                document.getElementById('itemScheduledDate').value = item.scheduledDate ? formatDateForInput(new Date(item.scheduledDate)) : '';
+                document.getElementById('itemDueDate').value = item.dueDate || '';
+                document.getElementById('itemScheduledDate').value = item.scheduledDate || '';
 
                 // Delete Button
                 document.getElementById('deleteItemBtn').style.display = 'inline-flex';
