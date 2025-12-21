@@ -170,8 +170,17 @@ const TaskService = {
     }
     
     const row = this.taskToRow(task);
-    // Write back. If sheet doesn't have enough columns yet, we might error if we try to set them.
-    // MigrationService.updateSchema() should be run first.
+    
+    // Safety: Ensure sheet has enough columns
+    const currentMaxCols = sheet.getLastColumn();
+    if (row.length > currentMaxCols) {
+        const missing = row.length - currentMaxCols;
+        sheet.insertColumnsAfter(currentMaxCols, missing);
+        // Optionally update headers here if we knew them, but appendRow usually handles it for data
+    }
+
+    // Write back. 
+    // MigrationService.updateSchema() should be run first preferably, but this handles lazy expansion.
     sheet.getRange(rowNum, 1, 1, row.length).setValues([row]);
     
     return { success: true, task: task };

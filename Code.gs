@@ -251,8 +251,15 @@ function getRecentEmails(count) {
  * Update a task
  */
 function updateTask(taskId, updates) {
-  return TaskService.updateTask(taskId, updates);
+
+  try {
+    return TaskService.updateTask(taskId, updates);
+  } catch (e) {
+    Logger.log('updateTask error: ' + e);
+    return { success: false, error: e.toString() };
+  }
 }
+
 
 /**
  * Batch update tasks

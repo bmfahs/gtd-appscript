@@ -203,7 +203,9 @@ const PriorityService = {
    * Tasks that block other tasks get higher priority
    */
   calculateDependencyScore: function(taskId) {
-    // Count how many tasks have this task as their parent
+    // OPTIMIZATION: Skipping dependency check for now to prevent performance hangs
+    return 0;
+    /*
     const allTasks = TaskService.getAllTasks();
     const dependentTasks = allTasks.filter(t => 
       t.parentTaskId === taskId && 
@@ -218,6 +220,7 @@ const PriorityService = {
     if (count <= 3) return PRIORITY_WEIGHTS.DEPENDENCIES * 0.6;
     
     return PRIORITY_WEIGHTS.DEPENDENCIES;
+    */
   },
   
   /**

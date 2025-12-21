@@ -788,11 +788,76 @@
             font-size: 16px;
             color: var(--text-secondary);
         }
+
+        .queue-status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-lg);
+            z-index: 1000;
+            display: none;
+            /* Hidden by default */
+            font-size: 13px;
+        }
+
+        .queue-header {
+            padding: 10px 14px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .queue-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .queue-item {
+            padding: 8px 14px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .queue-item:last-child {
+            border-bottom: none;
+        }
+
+        .queue-item.processing {
+            color: var(--primary);
+        }
+
+        .queue-item.error {
+            color: var(--danger);
+        }
+
+        .queue-item .status-icon {
+            font-size: 14px;
+        }
+
+        .queue-item.processing .status-icon {
+            animation: spin 1s linear infinite;
+        }
     </style>
 </head>
 
 <body>
     <div id="app">
+        <div id="queueStatus" class="queue-status">
+            <div class="queue-header">
+                <span id="queueTitle">Syncing...</span>
+                <span id="queueCount" class="badge">0</span>
+            </div>
+            <div id="queueList" class="queue-list"></div>
+        </div>
         <header class="header">
             <div class="header-left">
                 <button class="menu-toggle" onclick="toggleSidebar()">
@@ -2033,24 +2098,7 @@
             showToast('Added');
             i.value = '';
 
-            google.script.run.withSuccessHandler(function (x) {
-                // Replace temp task with real task
-                var idx = state.tasks.findIndex(function (task) { return task.id === tempId; });
-                if (idx !== -1) {
-                    state.tasks[idx] = x;
-                    // Re-render to ensure correct ID is used for clicks
-                    if (state.currentPage === 'inbox') renderPage('inbox');
-                }
-            }).withFailureHandler(function (e) {
-                // Remove temp task on error
-                var idx = state.tasks.findIndex(function (task) { return task.id === tempId; });
-                if (idx !== -1) {
-                    state.tasks.splice(idx, 1);
-                    updateInboxBadge();
-                    if (state.currentPage === 'inbox') renderPage('inbox');
-                }
-                showToast('Error: ' + e);
-            }).quickCapture(t, '');
+            requestQueue.enqueue('createTask', tempTask, tempId, 'Create: ' + t);
         }
         // Custom Project Dropdown Logic
         // This is now replaced by setupParentDropdown for the unified dialog.
@@ -2107,103 +2155,111 @@
         // Unified Item Dialog Logic
 
         function openItemDialog(id, typeOverride, parentIdOverride) {
-            document.getElementById('itemDialog').style.display = 'flex';
+            // FIX: Check if this ID was recently resolved (Stale DOM click)
+            if (requestQueue && requestQueue.resolvedIds[id]) {
+                console.log(`openItemDialog: Redirecting Stale ID ${id} -> ${requestQueue.resolvedIds[id]}`);
+                id = requestQueue.resolvedIds[id];
+            }
 
-            // Reset fields
-            document.getElementById('itemTitle').value = '';
-            document.getElementById('itemNotes').value = '';
-            document.getElementById('itemType').value = typeOverride || 'task';
-            document.getElementById('itemStatus').value = 'inbox';
-            document.getElementById('itemParent').value = parentIdOverride || '';
-            document.getElementById('itemParentDisplay').value = '';
-
-            // Task specific defaults
-            document.getElementById('itemContext').value = state.settings.defaultContext || '';
-            document.getElementById('itemEnergy').value = 'medium';
-            document.getElementById('itemTimeEstimate').value = '';
-            document.getElementById('itemWaitingFor').value = '';
-
-            // Project specific defaults
-            document.getElementById('itemArea').value = '';
-
-            // Common
-            document.getElementById('itemDueDate').value = '';
-            document.getElementById('itemScheduledDate').value = '';
-            document.getElementById('emailLink').style.display = 'none';
-            document.getElementById('deleteItemBtn').style.display = 'none';
-
+            var item = null;
             if (id) {
-                // Editing existing item
-                // Try to find in tasks first (since tasks and projects are now both technically tasks in DB)
-                // But wait, state.projects and state.tasks are separate lists in frontend state.
-                // We need to check both or check ID map if we had one.
-
-                var item = state.tasks.find(x => x.id === id);
-                var isProjectState = false;
+                // Determine list to search based on type override or search both
+                // Ideally we know if it is a task or project.
+                // But simplified: check tasks then projects.
+                item = state.tasks.find(function (t) { return t.id === id; });
+                if (!item) {
+                    item = state.projects.find(function (p) { return p.id === id; });
+                }
 
                 if (!item) {
-                    item = state.projects.find(x => x.id === id);
-                    isProjectState = true;
+                    console.error('Item not found:', id);
+                    if (id.startsWith('temp-')) {
+                        alert('This item is still syncing. Please wait a moment.');
+                        return;
+                    }
+                }
+            }
+
+            state.currentItem = item; // Stores ref (or null for new)
+
+            // SHOW DIALOG
+            document.getElementById('itemDialog').style.display = 'flex';
+
+            // Reset/Populate Fields
+            if (item) {
+                // EDIT MODE
+                document.getElementById('itemDialogTitle').textContent = 'Edit Item';
+                document.getElementById('itemTitle').value = item.title || item.name || '';
+                document.getElementById('itemNotes').value = item.notes || item.description || '';
+                document.getElementById('itemStatus').value = item.status || 'next';
+
+                // Type Logic
+                var type = item.type || (state.projects.some(p => p.id === id) ? 'project' : 'task');
+                document.getElementById('itemType').value = type;
+
+                // Parent
+                var pId = item.projectId || item.parentTaskId || item.parentProjectId || '';
+                document.getElementById('itemParent').value = pId;
+                document.getElementById('itemParentDisplay').value = '';
+                if (pId) {
+                    var p = state.projects.find(x => x.id === pId);
+                    if (p) document.getElementById('itemParentDisplay').value = p.name;
                 }
 
-                if (item) {
-                    state.currentItem = item;
-                    document.getElementById('itemDialogTitle').textContent = 'Edit Item';
-                    document.getElementById('itemTitle').value = item.title || item.name; // Task vs Project prop
-                    document.getElementById('itemNotes').value = item.notes || item.description || '';
-                    document.getElementById('itemStatus').value = item.status;
+                // Task specifics
+                document.getElementById('itemContext').value = item.contextId || state.settings.defaultContext || '';
+                document.getElementById('itemEnergy').value = item.energyRequired || 'medium';
+                document.getElementById('itemTimeEstimate').value = item.timeEstimate || '';
+                document.getElementById('itemWaitingFor').value = item.waitingFor || '';
 
-                    // Determine type
-                    // If it's in state.projects, it is a project or folder type
-                    // If in state.tasks, it is task type (unless we allow mixed, but currently separated)
-                    // Use item.type if available, otherwise infer from list
-                    var type = item.type || (isProjectState ? 'project' : 'task');
-                    document.getElementById('itemType').value = type;
+                // Project specifics
+                document.getElementById('itemArea').value = item.areaId || '';
 
-                    // Parent
-                    // For Task: parentTaskId or projectId
-                    // For Project: parentProjectId
-                    var pId = item.projectId || item.parentTaskId || item.parentProjectId || '';
-                    document.getElementById('itemParent').value = pId;
-                    if (pId) {
-                        var p = state.projects.find(x => x.id === pId); // Parent is always a project/folder
-                        if (p) document.getElementById('itemParentDisplay').value = p.name;
-                    }
+                // Common
+                document.getElementById('itemDueDate').value = item.dueDate ? formatDateForInput(new Date(item.dueDate)) : '';
+                document.getElementById('itemScheduledDate').value = item.scheduledDate ? formatDateForInput(new Date(item.scheduledDate)) : '';
 
-                    // Task specific
-                    document.getElementById('itemContext').value = item.contextId || '';
-                    document.getElementById('itemEnergy').value = item.energyRequired || 'medium';
-                    document.getElementById('itemTimeEstimate').value = item.timeEstimate || '';
-                    document.getElementById('itemWaitingFor').value = item.waitingFor || '';
+                // Delete Button
+                document.getElementById('deleteItemBtn').style.display = 'inline-flex';
 
-                    // Project specific
-                    document.getElementById('itemArea').value = item.areaId || '';
-
-                    // Common
-                    document.getElementById('itemDueDate').value = item.dueDate || '';
-                    document.getElementById('itemScheduledDate').value = item.scheduledDate || '';
-
-                    // Email
-                    if (item.emailThreadId) {
-                        document.getElementById('emailLink').style.display = 'block';
-                        document.getElementById('emailLinkAnchor').onclick = function () { openGmail(item.emailThreadId); return false; };
-                    }
-
-                    document.getElementById('deleteItemBtn').style.display = 'inline-flex';
+                // Email
+                if (item.emailThreadId) {
+                    document.getElementById('emailLink').style.display = 'block';
+                    document.getElementById('emailLinkAnchor').onclick = function () { openGmail(item.emailThreadId); return false; };
+                } else {
+                    document.getElementById('emailLink').style.display = 'none';
                 }
+
             } else {
-                // New Item
-                state.currentItem = null;
+                // NEW ITEM MODE
                 document.getElementById('itemDialogTitle').textContent = 'New Item';
+                document.getElementById('itemTitle').value = '';
+                document.getElementById('itemNotes').value = '';
+                document.getElementById('itemType').value = typeOverride || 'task';
+                document.getElementById('itemStatus').value = 'inbox';
 
+                document.getElementById('itemParent').value = parentIdOverride || '';
+                document.getElementById('itemParentDisplay').value = '';
                 if (parentIdOverride) {
                     var p = state.projects.find(x => x.id === parentIdOverride);
                     if (p) document.getElementById('itemParentDisplay').value = p.name;
                 }
+
+                document.getElementById('itemContext').value = state.settings.defaultContext || '';
+                document.getElementById('itemEnergy').value = 'medium';
+                document.getElementById('itemTimeEstimate').value = '';
+                document.getElementById('itemWaitingFor').value = '';
+                document.getElementById('itemArea').value = '';
+                document.getElementById('itemDueDate').value = '';
+                document.getElementById('itemScheduledDate').value = '';
+
+                document.getElementById('deleteItemBtn').style.display = 'none';
+                document.getElementById('emailLink').style.display = 'none';
             }
 
+            // Common setup for both New and Edit
             updateDialogVisibility();
-            setupParentDropdown(); // Hook up events for new dialog
+            setupParentDropdown();
         }
 
         function updateDialogVisibility() {
@@ -2297,26 +2353,29 @@
 
             if (id) {
                 // Update existing
-                showToast('Saving...');
-
-                // If changing type from Task to Project or vice versa, we might need to move it in local state lists
-                // But simply calling loadAllData() on success is safer and easier.
+                showToast('Queued...');
 
                 if (type === 'task') {
-                    google.script.run.withSuccessHandler(handleSaveSuccess).updateTask(id, d);
+                    requestQueue.enqueue('updateTask', { id: id, updates: d }, null, 'Update: ' + d.title);
                 } else {
-                    // Use updateProject for Project/Folder types (it handles the type update we fixed earlier)
-                    // Note: updateProject expects project-like keys, simplified above.
-                    google.script.run.withSuccessHandler(handleSaveSuccess).updateProject(id, d);
+                    requestQueue.enqueue('updateProject', { id: id, updates: d }, null, 'Update: ' + (d.name || d.title));
                 }
             } else {
-                // Create New
-                showToast('Creating...');
+                // Create New (Full Dialog)
+                showToast('Queued...');
+                var tempId = 'temp-' + Date.now();
+                // We don't have a full local optimistic update for Dialog creation yet (unlike Quick Capture), 
+                // but we can add one if we want. For now, let's just queue it.
+                // Actually, if we want "Create then Edit" loop to work for Dialog creations too, we need a Temp ID.
+
+                // Let's attach the Temp ID to the data so backend *could* ignore it, or just use it for queue resolution.
+
                 if (type === 'task') {
-                    // d has task fields
-                    google.script.run.withSuccessHandler(handleSaveSuccess).createTaskWrapper(d);
+                    // Normalize data for validation if needed, or backend handles it.
+                    // Backend expects object.
+                    requestQueue.enqueue('createTask', d, tempId, 'Create: ' + d.title);
                 } else {
-                    google.script.run.withSuccessHandler(handleSaveSuccess).createProject(d);
+                    requestQueue.enqueue('createProject', d, tempId, 'Create: ' + (d.name || d.title));
                 }
             }
 
@@ -2341,11 +2400,12 @@
             if (!state.currentItem || !confirm('Delete this item?')) return;
             var id = state.currentItem.id;
             var type = document.getElementById('itemType').value;
+            var title = state.currentItem.title || state.currentItem.name;
 
             if (type === 'task') {
-                google.script.run.withSuccessHandler(handleSaveSuccess).deleteTask(id);
+                requestQueue.enqueue('deleteTask', { id: id }, null, 'Delete: ' + title);
             } else {
-                google.script.run.withSuccessHandler(handleSaveSuccess).deleteProject(id);
+                requestQueue.enqueue('deleteProject', { id: id }, null, 'Delete: ' + title);
             }
             closeItemDialog();
         }
@@ -2435,18 +2495,8 @@
                 renderPage(state.currentPage);
             }
 
-            google.script.run.withSuccessHandler(function (r) {
-                if (r.success) {
-                    showToast('Converted to Project');
-                    loadAllData();
-                } else {
-                    showToast('Error: ' + (r.error || 'Unknown error'));
-                    loadAllData();
-                }
-            }).withFailureHandler(function (e) {
-                showToast('Error: ' + e);
-                loadAllData();
-            }).convertTaskToProject(taskId);
+            // Queue Request
+            requestQueue.enqueue('convertTask', { id: taskId }, null, 'Convert to Project');
         }
 
         function downloadExport() {
@@ -2783,20 +2833,12 @@
                 updateNextActionsBadge();
             }
 
-            google.script.run.withSuccessHandler(function (r) {
-                if (r.success) {
-                    showToast('Completed');
-                } else {
-                    // Revert if failed
-                    if (t) {
-                        t.status = r.task ? r.task.status : 'next'; // Fallback
-                        renderPage(state.currentPage);
-                        showToast('Error: ' + (r.error || 'Unknown error'));
-                    }
-                }
-            }).withFailureHandler(function (e) {
-                showToast('Error: ' + e);
-            }).completeTask(id);
+            // Queue Request
+            requestQueue.enqueue('completeTask', { id: id }, null, 'Complete Task');
+            // Note: The RequestQueue generic handler doesn't have specific revert logic for this custom UI logic
+            // But since we process serially, if it fails, the global error handler in RequestQueue will create a toast.
+            // For a robust optimistic revert, we'd need to add that callback to the queue item or handle it in the generic handler.
+            // Given the complexity/rarity, we'll stick to the generic error toast for now. If it fails, a subsequent reloadAllData() (triggered manually or auto) fixes it.
         }
 
 
@@ -2872,6 +2914,290 @@
         function addArea() { var n = prompt('Area name:'); if (!n) return; var i = prompt('Emoji:', '📁'); google.script.run.withSuccessHandler(function (a) { state.areas.push(a); populateSelects(); renderPage('areas'); showToast('Added'); }).withFailureHandler(function (e) { showToast('Error: ' + e); }).createArea({ name: n, icon: i || '📁' }); }
 
 
+
+
+        // --- Request Queue System ---
+
+        class RequestQueue {
+            constructor() {
+                this.queue = [];
+                this.isProcessing = false;
+                this.resolvedIds = {}; // Cache map of tempId -> realId
+            }
+
+            // Add a request to the queue
+            // type: 'createTask', 'updateTask', etc.
+            // data: payload object
+            // tempId: optional temporary ID associated with this request (for resolution)
+            // description: Text to show in UI
+            enqueue(type, data, tempId, description) {
+                // 1. Check if any part of 'data' uses a Temp ID that is ALREADY resolved
+                if (this.resolvedIds[data.id]) {
+                    console.log(`Enqueue: Auto-resolving known ID ${data.id} -> ${this.resolvedIds[data.id]}`);
+                    data.id = this.resolvedIds[data.id];
+                }
+                // Check updates payload if present
+                if (data.updates) {
+                    if (data.updates.projectId && this.resolvedIds[data.updates.projectId]) {
+                        data.updates.projectId = this.resolvedIds[data.updates.projectId];
+                    }
+                }
+
+                const request = {
+                    id: 'req-' + Date.now() + Math.random().toString(36).substr(2, 9),
+                    type: type,
+                    data: data,
+                    tempId: tempId || null,
+                    description: description || 'Updating...',
+                    status: 'pending',
+                    retryCount: 0
+                };
+
+                this.queue.push(request);
+                this.renderUI();
+                this.process();
+            }
+
+            // Process the next item in queue
+            process() {
+                if (this.isProcessing || this.queue.length === 0) return;
+
+                const req = this.queue[0];
+                this.isProcessing = true;
+                req.status = 'processing';
+                this.renderUI();
+
+                // Execute based on type
+                const handler = this.getHandler(req);
+
+                if (!handler) {
+                    console.error('No handler for type:', req.type);
+                    this.completeRequest(req, false, 'Unknown request type');
+                    return;
+                }
+
+                // TIMEOUT SAFETY: Fail request if it takes too long (30s)
+                const timeoutMs = 30000;
+                const timeoutId = setTimeout(() => {
+                    if (req.status === 'processing') {
+                        console.error('Request timed out:', req);
+                        this.completeRequest(req, false, 'Request timed out. Please try refreshing.');
+                    }
+                }, timeoutMs);
+
+                req.timeoutId = timeoutId;
+
+                try {
+                    handler(req.data)
+                        .then(response => {
+                            clearTimeout(timeoutId);
+                            this.completeRequest(req, true, response);
+                        })
+                        .catch(error => {
+                            clearTimeout(timeoutId);
+                            this.completeRequest(req, false, error);
+                        });
+                } catch (e) {
+                    clearTimeout(timeoutId);
+                    this.completeRequest(req, false, 'Client Handler Error: ' + e);
+                }
+            }
+
+            getHandler(req) {
+                // Return a promise-wrapping function for Google Script calls
+                return (data) => {
+                    return new Promise((resolve, reject) => {
+                        // DEFENSIVE CHECK: Ensure ID is resolved even if queue iteration missed it
+                        if (data.id && this.resolvedIds[data.id]) {
+                            console.log(`Handler: Late-resolving ID ${data.id} -> ${this.resolvedIds[data.id]}`);
+                            data.id = this.resolvedIds[data.id];
+                        }
+                        // Also check updates.projectId / parentTaskId
+                        if (data.updates) {
+                            if (data.updates.projectId && this.resolvedIds[data.updates.projectId]) {
+                                data.updates.projectId = this.resolvedIds[data.updates.projectId];
+                            }
+                            if (data.updates.parentTaskId && this.resolvedIds[data.updates.parentTaskId]) {
+                                data.updates.parentTaskId = this.resolvedIds[data.updates.parentTaskId];
+                            }
+                        }
+
+                        const run = google.script.run
+                            .withSuccessHandler(res => {
+                                // ...
+                                if (res && res.success === false) reject(res.error);
+                                else resolve(res); // Task/Object returned directly or {success:true}
+                            })
+                            .withFailureHandler(err => reject(err));
+
+                        switch (req.type) {
+                            case 'createTask': run.createTaskWrapper(data); break;
+                            case 'updateTask': run.updateTask(data.id, data.updates); break;
+                            case 'deleteTask': run.deleteTask(data.id); break;
+
+                            case 'createProject': run.createProject(data); break;
+                            case 'updateProject': run.updateProject(data.id, data.updates); break;
+                            case 'deleteProject': run.deleteProject(data.id); break;
+
+                            case 'convertTask': run.convertTaskToProject(data.id); break;
+                            case 'completeTask': run.completeTask(data.id); break;
+                            case 'completeProject': run.completeProject(data.id); break;
+
+                            default: reject('Unknown operation');
+                        }
+                    });
+                };
+            }
+
+            completeRequest(req, success, result) {
+                try {
+                    this.isProcessing = false;
+
+                    if (success) {
+                        // ID Resolution
+                        // Result might be the object directly (from direct service call) OR a wrapper { success: true, task: ... }
+                        // Wrapper usually used for Create calls
+                        let realObj = result;
+                        if (result && result.task) realObj = result.task; // Fix for createTaskWrapper
+                        else if (result && result.project) realObj = result.project; // Potential fix for createProject
+
+                        // Fallback to result if it has .id directly (e.g. from service directly)
+
+                        if ((req.type === 'createTask' || req.type === 'createProject') && req.tempId && realObj && realObj.id) {
+                            const realId = realObj.id;
+                            this.resolvedIds[req.tempId] = realId; // Store in cache
+
+                            // 1. Resolve pending queue items
+                            this.resolveIds(req.tempId, realId);
+
+                            // 2. Update Local State (Tasks Array)
+                            let collection = (req.type === 'createProject') ? state.projects : state.tasks;
+                            const localIdx = collection.findIndex(t => t.id === req.tempId);
+
+                            if (localIdx !== -1) {
+                                collection[localIdx] = realObj;
+
+                                // 3. Fix Critical Bug: Update state.currentItem if it matches!
+                                if (state.currentItem && state.currentItem.id === req.tempId) {
+                                    console.log('Updating state.currentItem reference to real object');
+                                    state.currentItem = realObj;
+                                }
+                            }
+                        }
+
+                        // FIX: Also update local state for Update operations!
+                        // If we edited coordinates/notes, we want local state to match server state immediately
+                        if ((req.type === 'updateTask' || req.type === 'updateProject') && realObj && realObj.id) {
+                            let collection = (req.type === 'updateProject') ? state.projects : state.tasks;
+                            const localIdx = collection.findIndex(t => t.id === realObj.id);
+                            if (localIdx !== -1) {
+                                collection[localIdx] = realObj;
+                                // Update currentItem if it's the one open
+                                if (state.currentItem && state.currentItem.id === realObj.id) {
+                                    state.currentItem = realObj;
+                                }
+                            }
+                        }
+
+                        // FIX: Remove items from local state on delete operations!
+                        if ((req.type === 'deleteTask' || req.type === 'deleteProject')) {
+                            const idToDelete = req.data.id;
+                            let collection = (req.type === 'deleteProject') ? state.projects : state.tasks;
+                            const localIdx = collection.findIndex(t => t.id === idToDelete);
+                            if (localIdx !== -1) {
+                                console.log('Removing deleted item from local state:', idToDelete);
+                                collection.splice(localIdx, 1);
+                                if (state.currentItem && state.currentItem.id === idToDelete) {
+                                    state.currentItem = null;
+                                }
+                            }
+                        }
+
+                        // Remove from queue
+                        this.queue.shift();
+                        this.renderUI();
+
+                        // 4. Critical: Re-render the page so DOM onclick handlers use the Real ID
+                        try {
+                            if (typeof renderPage === 'function') {
+                                renderPage(state.currentPage);
+                            }
+                            // Explicitly update badges
+                            if (typeof updateInboxBadge === 'function') updateInboxBadge();
+                            if (typeof updateAttentionBadge === 'function') updateAttentionBadge();
+                            if (typeof updateNextActionsBadge === 'function') updateNextActionsBadge();
+                        } catch (e) { console.error('Render error:', e); }
+                    } else {
+                        console.error('Request failed:', req, result);
+                        req.status = 'error';
+                        req.error = result;
+                        req.retryCount++;
+
+                        showToast('Sync Error: ' + result);
+                        this.queue.shift(); // Drop it for now to unblock
+                        this.renderUI();
+                    } // End if(success)
+
+                } catch (e) {
+                    console.error('CRITICAL QUEUE ERROR:', e);
+                    this.isProcessing = false;
+                    this.queue.shift(); // Force unblock
+                    this.renderUI();
+                }
+
+                // Trigger next loop safely
+                setTimeout(() => this.process(), 50);
+            }
+
+            // Update pending requests to use Real ID instead of Temp ID
+            resolveIds(tempId, realId) {
+                console.log(`Resolving Queue ID: ${tempId} -> ${realId}`);
+                this.queue.forEach(q => {
+                    // Check payload for IDs
+                    // updateTask: data.id
+                    if (q.data && q.data.id === tempId) {
+                        q.data.id = realId;
+                    }
+                    // Parent IDs? 
+                    if (q.data && q.data.updates && q.data.updates.projectId === tempId) {
+                        q.data.updates.projectId = realId;
+                    }
+                    if (q.data && q.data.updates && q.data.updates.parentTaskId === tempId) {
+                        q.data.updates.parentTaskId = realId;
+                    }
+                    // Handle other references as needed
+                });
+            }
+
+            renderUI() {
+                const container = document.getElementById('queueStatus');
+                const list = document.getElementById('queueList');
+                const count = document.getElementById('queueCount');
+
+                if (this.queue.length === 0) {
+                    container.style.display = 'none';
+                    return;
+                }
+
+                container.style.display = 'block';
+                count.textContent = this.queue.length;
+
+                let h = '';
+                this.queue.forEach(req => {
+                    let icon = 'hourglass_empty';
+                    if (req.status === 'processing') icon = 'sync';
+                    if (req.status === 'error') icon = 'error';
+
+                    h += `<div class="queue-item ${req.status}">
+                        <span class="material-icons status-icon">${icon}</span>
+                        <span>${req.description}</span>
+                    </div>`;
+                });
+                list.innerHTML = h;
+            }
+        }
+
+        const requestQueue = new RequestQueue();
 
         document.addEventListener('DOMContentLoaded', function () { init('inbox'); });
         function openGmail(threadId) {
