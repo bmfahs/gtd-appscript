@@ -2022,32 +2022,45 @@
             const now = new Date();
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-            // 1. Due Date (Critical)
+            // --- 1. Star / Focus (Top Priority) ---
+            if (task.isStarred) score += 5000;
+
+            // --- 2. MLO Core: Importance * Urgency ---
+            // Default to 2 (Normal) if unset
+            let imp = task.importance ? parseFloat(task.importance) : 2;
+            let urg = task.urgency ? parseFloat(task.urgency) : 2;
+
+            // --- 3. Due Date Amplifier (Increases Urgency) ---
             if (task.dueDate) {
-                // Parse "YYYY-MM-DD"
                 const parts = task.dueDate.split('-');
                 const due = new Date(parts[0], parts[1] - 1, parts[2]);
                 const diffTime = due - today;
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-                if (diffDays < 0) score += 1000; // Overdue
-                else if (diffDays === 0) score += 500; // Today
-                else if (diffDays <= 1) score += 200; // Tomorrow
-                else if (diffDays <= 7) score += 100; // This Week
-                else score += 10; // Future due date
+                if (diffDays < 0) urg *= 4;      // Overdue (4x Urgency)
+                else if (diffDays === 0) urg *= 3; // Today (3x Urgency)
+                else if (diffDays === 1) urg *= 2; // Tomorrow (2x Urgency)
+                else if (diffDays <= 7) urg *= 1.5; // This Week (1.5x)
             }
 
-            // 2. Energy (Effort) - Prefer Low Energy (Quick Wins)
-            if (task.energyRequired === 'low') score += 20;
-            else if (task.energyRequired === 'medium') score += 10;
+            // Add Base Score
+            score += (imp * 10) * (urg * 10);
 
-            // 3. Time Estimate - Prefer Short Tasks
+            // --- 4. Effort / Energy (Tie Breaker: Least Effort First) ---
+            // Low Energy > Medium > High
+            if (task.energyRequired === 'low') score += 50;
+            else if (task.energyRequired === 'medium') score += 20;
+
+            // --- 5. Time Estimate (Tie Breaker: Quickest First) ---
             if (task.timeEstimate) {
-                const min = parseInt(task.timeEstimate) || 0;
-                if (min > 0 && min <= 15) score += 15;
-                else if (min <= 30) score += 10;
-                else if (min <= 60) score += 5;
+                // Invert: 5 mins = +50, 60 mins = +0
+                // Cap at 120 mins
+                let mins = parseInt(task.timeEstimate);
+                if (mins > 0 && mins < 120) {
+                    score += (120 - mins) * 0.5;
+                }
             }
+
 
             return score;
         }
