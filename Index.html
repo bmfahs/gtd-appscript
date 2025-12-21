@@ -1598,15 +1598,6 @@
                 h += '<div class="empty-state"><span class="material-icons">inbox</span><h3>Inbox Zero!</h3><p>Everything processed.</p></div>';
             } else {
                 h += '<div class="task-list" id="inboxList">';
-                // Header Row for Bulk Edit
-                h += '<div style="display:flex; padding:8px 16px; font-weight:600; font-size:12px; color:var(--text-muted); border-bottom:1px solid var(--border-color);">';
-                h += '<div style="flex:2">Task</div>'; // Title
-                h += '<div style="flex:0 0 100px; margin-right:8px">Type</div>'; // Type
-                h += '<div style="flex:0 0 140px; margin-right:8px">Project</div>';
-                h += '<div style="flex:0 0 110px; margin-right:8px">Context</div>';
-                h += '<div style="flex:0 0 100px; margin-right:8px">Actions</div>'; // Status/Date/etc
-                h += '</div>';
-
                 t.forEach(function (x) { h += renderInboxBulkRow(x); });
                 h += '</div>';
                 h += '<button class="add-btn" onclick="saveInboxUpdates()" style="margin-top:16px; justify-content:center; background:var(--primary); color:white; border:none;"><span class="material-icons">save</span> Process Inbox</button>';
@@ -1615,41 +1606,50 @@
         }
 
         function renderInboxBulkRow(t) {
-            // Compact row with inline edits
-            // Fields: Title (read-only link), Project, Context, Scheduled, Status, Time, Energy, Due
+            // Layout: 3 Rows
+            // Row 1: Star | Title | Status
+            // Row 2: Type | Project | Context | Importance | Urgency
+            // Row 3: Due | Scheduled | Time | Energy
 
-            var h = '<div class="task-item fix-item" data-id="' + t.id + '" style="flex-direction:column; align-items:stretch; gap:8px; cursor:default;">';
+            var h = '<div class="task-item fix-item" data-id="' + t.id + '" style="flex-direction:column; align-items:stretch; gap:8px; cursor:default; padding:12px;">';
 
-            // Top: Title (Click to open dialog still works?) -> Let's make title clickable
-            // Top: Title (Click to open dialog still works?) -> Let's make title clickable + Star
+            // --- Row 1: Star | Title | Status ---
             h += '<div style="display:flex; align-items:center; gap:8px;">';
+            // Star
             var starIcon = t.isStarred ? 'star' : 'star_border';
             var starColor = t.isStarred ? '#f59e0b' : 'var(--text-muted)';
-            h += '<span class="material-icons fix-star" onclick="event.stopPropagation(); toggleBulkStar(this)" style="cursor:pointer; color:' + starColor + '; font-size:18px;" data-starred="' + (t.isStarred || 'false') + '">' + starIcon + '</span>';
-            h += '<div class="task-title" onclick="openItemDialog(\'' + t.id + '\')" style="cursor:pointer; font-weight:600; color:var(--primary); flex:1;">' + esc(t.title) + '</div>';
-            h += '</div>'; // end flex container
+            h += '<span class="material-icons fix-star" onclick="event.stopPropagation(); toggleBulkStar(this)" style="cursor:pointer; color:' + starColor + '; font-size:20px;" data-starred="' + (t.isStarred || 'false') + '">' + starIcon + '</span>';
+            // Title
+            h += '<div class="task-title" onclick="openItemDialog(\'' + t.id + '\')" style="cursor:pointer; font-weight:600; color:var(--primary); flex:1; font-size:14px;">' + esc(t.title) + '</div>';
+            // Status (Moved to Top Row)
+            h += '<select class="form-control fix-status" style="width:110px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            var statuses = ['inbox', 'next', 'waiting', 'scheduled', 'someday', 'done', 'deleted'];
+            statuses.forEach(function (s) {
+                var sel = (t.status === s) ? 'selected' : '';
+                h += '<option value="' + s + '" ' + sel + '>' + s.charAt(0).toUpperCase() + s.slice(1) + '</option>';
+            });
+            h += '</select>';
+            h += '</div>';
 
-            // Middle: Project & Context & Status
-            h += '<div style="display:flex; gap:8px; flex-wrap:wrap;">';
+            // --- Row 2: Type | Project | Context | Importance | Urgency ---
+            h += '<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">';
 
-            // Type Selector
-            h += '<select class="form-control fix-type" style="width:100px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            // Type
+            h += '<select class="form-control fix-type" style="width:90px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
             h += '<option value="task" ' + (t.type === 'task' || !t.type ? 'selected' : '') + '>Task</option>';
             h += '<option value="project" ' + (t.type === 'project' ? 'selected' : '') + '>Project</option>';
             h += '<option value="folder" ' + (t.type === 'folder' ? 'selected' : '') + '>Folder</option>';
             h += '</select>';
 
-            // Project Selector (Hierarchical Custom Dropdown)
-            // Need a container for relative positioning
+            // Project
             h += '<div style="flex:1; min-width:120px; position:relative;">';
             h += '<input type="text" class="form-control fix-project-display" placeholder="Select Project..." value="' + esc(getParentProjectName(t.projectId)) + '" onfocus="showInlineProjectDropdown(this)" oninput="filterInlineProjectDropdown(this)" onclick="event.stopPropagation()" style="width:100%; padding:4px; font-size:12px;">';
             h += '<input type="hidden" class="fix-project" value="' + (t.projectId || '') + '">';
-            // Dropdown container
             h += '<div class="fix-project-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:200px; overflow-y:auto; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:4px; z-index:1000; box-shadow:0 4px 6px rgba(0,0,0,0.1);"></div>';
             h += '</div>';
 
-            // Context Selector
-            h += '<select class="form-control fix-context" style="width:120px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            // Context
+            h += '<select class="form-control fix-context" style="width:110px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
             h += '<option value="">Context...</option>';
             state.contexts.forEach(function (c) {
                 var sel = (t.contextId === c.id) ? 'selected' : '';
@@ -1657,58 +1657,68 @@
             });
             h += '</select>';
 
-            h += '<select class="form-control fix-status" style="width:100px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
-            var statuses = ['inbox', 'next', 'waiting', 'scheduled', 'someday', 'done', 'deleted'];
-            statuses.forEach(function (s) {
-                var sel = (t.status === s) ? 'selected' : '';
-                h += '<option value="' + s + '" ' + sel + '>' + s.charAt(0).toUpperCase() + s.slice(1) + '</option>';
-            });
-            h += '</select>';
-
-            // Importance
+            // Importance (With Placeholder)
+            h += '<div style="display:flex; align-items:center; gap:4px;">';
+            h += '<span style="font-size:11px; color:var(--text-muted)">Imp:</span>';
             h += '<select class="form-control fix-importance" style="width:70px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            h += '<option value="">Select...</option>';
             ['1', '2', '3', '4'].forEach(v => {
                 var l = { 1: 'Low', 2: 'Nrm', 3: 'Hi', 4: 'Top' }[v];
-                var sel = (t.importance == v || (!t.importance && v == 2)) ? 'selected' : '';
+                var sel = (t.importance == v) ? 'selected' : '';
                 h += '<option value="' + v + '" ' + sel + '>' + l + '</option>';
             });
             h += '</select>';
+            h += '</div>';
 
-            // Urgency
+            // Urgency (With Placeholder)
+            h += '<div style="display:flex; align-items:center; gap:4px;">';
+            h += '<span style="font-size:11px; color:var(--text-muted)">Urg:</span>';
             h += '<select class="form-control fix-urgency" style="width:70px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            h += '<option value="">Select...</option>';
             ['1', '2', '3', '4'].forEach(v => {
                 var l = { 1: 'Low', 2: 'Nrm', 3: 'Hi', 4: 'Crt' }[v];
-                var sel = (t.urgency == v || (!t.urgency && v == 2)) ? 'selected' : '';
+                var sel = (t.urgency == v) ? 'selected' : '';
                 h += '<option value="' + v + '" ' + sel + '>' + l + '</option>';
             });
             h += '</select>';
+            h += '</div>';
 
-            h += '</div>'; // End Middle
+            h += '</div>'; // End Row 2
 
-            // Bottom: Dates & Details
-            h += '<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">';
+            // --- Row 3: Dates & Details ---
+            h += '<div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">';
 
             // Due Date
+            h += '<div style="display:flex; align-items:center; gap:4px;">';
             h += '<span style="font-size:11px; color:var(--text-muted)">Due:</span>';
-            h += '<input type="date" class="form-control fix-due" value="' + (t.dueDate || '') + '" style="width:110px; padding:3px; font-size:12px;" onclick="event.stopPropagation()">';
+            h += '<input type="date" class="form-control fix-due" value="' + (t.dueDate || '') + '" style="width:120px; padding:3px; font-size:12px;" onclick="event.stopPropagation()">';
+            h += '</div>';
 
             // Scheduled
+            h += '<div style="display:flex; align-items:center; gap:4px;">';
             h += '<span style="font-size:11px; color:var(--text-muted)">Sched:</span>';
-            h += '<input type="date" class="form-control fix-scheduled" value="' + (t.scheduledDate || '') + '" style="width:110px; padding:3px; font-size:12px;" onclick="event.stopPropagation()">';
+            h += '<input type="date" class="form-control fix-scheduled" value="' + (t.scheduledDate || '') + '" style="width:120px; padding:3px; font-size:12px;" onclick="event.stopPropagation()">';
+            h += '</div>';
 
             // Time
-            h += '<input type="number" class="fix-time" placeholder="Min" value="' + (t.timeEstimate || '') + '" style="width:50px; padding:4px; font-size:12px; border:1px solid var(--border-color); border-radius:4px;" onclick="event.stopPropagation()">';
+            h += '<div style="display:flex; align-items:center; gap:4px;">';
+            h += '<span style="font-size:11px; color:var(--text-muted)">Time:</span>';
+            h += '<input type="number" class="fix-time" placeholder="Min" value="' + (t.timeEstimate || '') + '" style="width:60px; padding:4px; font-size:12px; border:1px solid var(--border-color); border-radius:4px;" onclick="event.stopPropagation()">';
+            h += '</div>';
 
             // Energy
+            h += '<div style="display:flex; align-items:center; gap:4px;">';
+            h += '<span style="font-size:11px; color:var(--text-muted)">Energy:</span>';
             h += '<select class="form-control fix-energy" style="width:80px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
             h += '<option value="medium" ' + (t.energyRequired === 'medium' ? 'selected' : '') + '>⚡ Med</option>';
             h += '<option value="high" ' + (t.energyRequired === 'high' ? 'selected' : '') + '>⚡ High</option>';
             h += '<option value="low" ' + (t.energyRequired === 'low' ? 'selected' : '') + '>⚡ Low</option>';
             h += '</select>';
-
-            h += '</div>'; // End Bottom
-
             h += '</div>';
+
+            h += '</div>'; // End Row 3
+
+            h += '</div>'; // End Container
             return h;
         }
 
