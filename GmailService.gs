@@ -210,7 +210,8 @@ ${truncatedBody}${body && body.length > 500 ? '...' : ''}`;
     // Search for unscanned inbox threads
     // Note: Gmail search is not real-time, so we might see recently labeled threads
     const query = 'label:inbox -label:GTD/Scanned -label:GTD/Suggested';
-    const threads = GmailApp.search(query, 0, 20); // Process in batches of 20
+    const BATCH_SIZE = 5; // Reduced from 20 to give faster feedback
+    const threads = GmailApp.search(query, 0, BATCH_SIZE);
     
     console.log(`Found ${threads.length} threads to scan`);
     
@@ -223,12 +224,13 @@ ${truncatedBody}${body && body.length > 500 ? '...' : ''}`;
                       'user';
     
     let processedCount = 0;
+    let firstError = null;
     
     for (const thread of threads) {
       // Check time limit
       if (new Date().getTime() - startTime > TIME_LIMIT) {
         console.log('Time limit reached, stopping.');
-        return { complete: false, count: processedCount };
+        return { complete: false, count: processedCount, threadsFound: threads.length, error: firstError };
       }
       
       const messages = thread.getMessages();
@@ -248,21 +250,25 @@ ${truncatedBody}${body && body.length > 500 ? '...' : ''}`;
         userEmail
       );
       
+      // Enforce Rate Limiting (Gemini Free Tier is ~15 RPM = 1 req / 4s)
+      Utilities.sleep(4000); 
+      
       if (analysis.success) {
         if (analysis.requiresAction) {
           console.log(`Suggested: ${lastMessage.getSubject()} (${analysis.reason})`);
           thread.addLabel(suggestedLabel);
         }
-        
-        // Only mark as scanned if analysis was successful
         thread.addLabel(scannedLabel);
         processedCount++;
       } else {
-        console.log(`Skipping label for ${lastMessage.getSubject()} due to analysis failure.`);
+        const msg = `Analysis failed for ${lastMessage.getSubject()}. Reason: ${analysis.reason}`;
+        console.log(msg);
+        Logger.log(msg); // Ensure it hits Execution Log
+        if (!firstError) firstError = analysis.reason;
       }
     }
     
-    return { complete: threads.length < 20, count: processedCount };
+    return { complete: threads.length < BATCH_SIZE, count: processedCount, threadsFound: threads.length, error: firstError };
   }
 };
 

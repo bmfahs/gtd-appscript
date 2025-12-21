@@ -2710,6 +2710,12 @@
                         showLoading(false);
                         showToast('Scan Complete. Total Processed: ' + totalProcessed);
                         isScanning = false;
+                    } else if (r.count === 0 && r.threadsFound > 0) {
+                        // Stagnation detection: Found threads but couldn't process any
+                        showLoading(false);
+                        var errorMsg = r.error ? ': ' + r.error : '.';
+                        showToast('Scan Aborted. Error' + errorMsg);
+                        isScanning = false;
                     } else {
                         // Continue scanning
                         runBatch();
