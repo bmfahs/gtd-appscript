@@ -210,7 +210,7 @@ ${truncatedBody}${body && body.length > 500 ? '...' : ''}`;
     // Search for unscanned inbox threads
     // Note: Gmail search is not real-time, so we might see recently labeled threads
     const query = 'label:inbox -label:GTD/Scanned -label:GTD/Suggested';
-    const BATCH_SIZE = 5; // Reduced from 20 to give faster feedback
+    const BATCH_SIZE = 20; 
     const threads = GmailApp.search(query, 0, BATCH_SIZE);
     
     console.log(`Found ${threads.length} threads to scan`);
@@ -249,9 +249,6 @@ ${truncatedBody}${body && body.length > 500 ? '...' : ''}`;
         lastMessage.getFrom(),
         userEmail
       );
-      
-      // Enforce Rate Limiting (Gemini Free Tier is ~15 RPM = 1 req / 4s)
-      Utilities.sleep(4000); 
       
       if (analysis.success) {
         if (analysis.requiresAction) {
