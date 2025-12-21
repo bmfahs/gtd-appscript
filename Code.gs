@@ -630,7 +630,8 @@ function createTaskWrapper(taskData) {
     title: taskData.title,
     notes: taskData.notes,
     status: taskData.status,
-    projectId: taskData.projectId,
+    // Phase 1: Map projectId to parentTaskId
+    parentTaskId: taskData.parentTaskId || taskData.projectId,
     contextId: taskData.contextId,
     energyRequired: taskData.energyRequired,
     timeEstimate: taskData.timeEstimate,

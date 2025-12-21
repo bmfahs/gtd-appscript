@@ -165,7 +165,7 @@ const ImportService = {
         title: caption,
         notes: note || '',
         status: status,
-        projectId: currentProjectId || '', // Linked to parent project (legacy concept, now usually managed via parentTaskId)
+        projectId: currentProjectId || '', // Legacy prop, mapped to parentTaskId in TaskService
         contextId: contextId,
         waitingFor: '',
         dueDate: dueDate,

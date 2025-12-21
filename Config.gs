@@ -62,7 +62,7 @@ const TASK_COLS = {
   TITLE: 1,
   NOTES: 2,
   STATUS: 3,
-  PROJECT_ID: 4,
+  PROJECT_ID: 4, // DEPRECATED: Do not use. Use PARENT_TASK_ID (17) instead.
   CONTEXT_ID: 5,
   WAITING_FOR: 6,
   DUE_DATE: 7,

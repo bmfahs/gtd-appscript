@@ -126,7 +126,8 @@ const ProjectService = {
     
     return projects.map(project => {
       const tasks = allTasks.filter(t => 
-        t.projectId === project.id && 
+        // Phase 1: Match against parentTaskId
+        t.parentTaskId === project.id && 
         t.status !== STATUS.DONE && 
         t.status !== STATUS.DELETED
       );

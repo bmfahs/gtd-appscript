@@ -62,7 +62,8 @@ const TaskService = {
    * Get tasks by project
    */
   getTasksByProject: function(projectId) {
-    return this.getAllTasks().filter(t => t.projectId === projectId);
+    // Phase 1: Filter by parentTaskId
+    return this.getAllTasks().filter(t => t.parentTaskId === projectId);
   },
   
   /**
@@ -100,7 +101,8 @@ const TaskService = {
       title: taskData.title || '',
       notes: taskData.notes || '',
       status: taskData.status || STATUS.INBOX,
-      projectId: taskData.projectId || '',
+      // Phase 1: Map projectId input to parentTaskId if provided
+      projectId: taskData.parentTaskId || taskData.projectId || '', // Legacy prop mapped to new source
       contextId: taskData.contextId || '',
       waitingFor: taskData.waitingFor || '',
       dueDate: taskData.dueDate || '',
@@ -113,7 +115,8 @@ const TaskService = {
       priority: 0,
       energyRequired: taskData.energyRequired || ENERGY.MEDIUM,
       timeEstimate: taskData.timeEstimate || '',
-      parentTaskId: taskData.parentTaskId || '',
+      // Phase 1: Prefer parentTaskId, fallback to projectId input
+      parentTaskId: taskData.parentTaskId || taskData.projectId || '',
       sortOrder: taskData.sortOrder || this.getNextSortOrder(),
       type: taskData.type || TASK_TYPE.TASK,
       areaId: taskData.areaId || ''
@@ -346,7 +349,9 @@ const TaskService = {
       title: row[TASK_COLS.TITLE] || '',
       notes: row[TASK_COLS.NOTES] || '',
       status: row[TASK_COLS.STATUS] || STATUS.INBOX,
-      projectId: row[TASK_COLS.PROJECT_ID] || '',
+      // Phase 1: Map projectId property to PARENT_TASK_ID column
+      // This ensures legacy code reading .projectId gets the correct value
+      projectId: row[TASK_COLS.PARENT_TASK_ID] || '', 
       contextId: row[TASK_COLS.CONTEXT_ID] || '',
       waitingFor: row[TASK_COLS.WAITING_FOR] || '',
       dueDate: safeFormatDate(row[TASK_COLS.DUE_DATE]),
@@ -378,7 +383,9 @@ const TaskService = {
     row[TASK_COLS.TITLE] = task.title;
     row[TASK_COLS.NOTES] = task.notes;
     row[TASK_COLS.STATUS] = task.status;
-    row[TASK_COLS.PROJECT_ID] = task.projectId;
+    // Phase 1: Clear the projectId column (write empty string)
+    // We do NOT write task.projectId here anymore.
+    row[TASK_COLS.PROJECT_ID] = ''; 
     row[TASK_COLS.CONTEXT_ID] = task.contextId;
     row[TASK_COLS.WAITING_FOR] = task.waitingFor;
     row[TASK_COLS.DUE_DATE] = task.dueDate;
