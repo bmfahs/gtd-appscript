@@ -1620,7 +1620,12 @@
             var starColor = t.isStarred ? '#f59e0b' : 'var(--text-muted)';
             h += '<span class="material-icons fix-star" onclick="event.stopPropagation(); toggleBulkStar(this)" style="cursor:pointer; color:' + starColor + '; font-size:20px;" data-starred="' + (t.isStarred || 'false') + '">' + starIcon + '</span>';
             // Title
-            h += '<div class="task-title" onclick="openItemDialog(\'' + t.id + '\')" style="cursor:pointer; font-weight:600; color:var(--primary); flex:1; font-size:14px;">' + esc(t.title) + '</div>';
+            h += '<div class="task-title" onclick="openItemDialog(\'' + t.id + '\')" style="cursor:pointer; font-weight:600; color:var(--primary); flex:1; font-size:14px;">' + esc(t.title);
+            // Email Link Icon (Bulk Row)
+            if (t.emailThreadId) {
+                h += ' <a href="#" onclick="event.stopPropagation(); openGmail(\'' + t.emailThreadId + '\'); return false;" class="email-link-icon" title="Open in Gmail"><span class="material-icons" style="font-size: 16px; vertical-align: middle; color: var(--primary-color);">mail</span></a>';
+            }
+            h += '</div>';
             // Status (Moved to Top Row)
             h += '<select class="form-control fix-status" style="width:110px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
             var statuses = ['inbox', 'next', 'waiting', 'scheduled', 'someday', 'done', 'deleted'];
@@ -1996,7 +2001,11 @@
                     h += '<div class="task-item" style="margin-left: ' + padding + 'px" onclick="openItemDialog(\'' + t.id + '\')">';
                     h += '<div class="task-checkbox" onclick="event.stopPropagation();completeTaskClick(\'' + t.id + '\')"></div>';
                     h += '<div class="task-content">';
-                    h += '<div class="task-title">' + esc(t.title) + '</div>';
+                    h += '<div class="task-title">' + esc(t.title);
+                    if (t.emailThreadId) {
+                        h += ' <a href="#" onclick="event.stopPropagation(); openGmail(\'' + t.emailThreadId + '\'); return false;" class="email-link-icon" title="Open in Gmail"><span class="material-icons" style="font-size: 16px; vertical-align: middle; color: var(--primary-color);">mail</span></a>';
+                    }
+                    h += '</div>';
 
                     var m = [];
                     if (ctx) m.push(ctx.icon + ' ' + ctx.name);
