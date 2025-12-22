@@ -1799,7 +1799,7 @@
             var h = '';
             var matches = [];
 
-            var tree = buildProjectTree(state.projects.filter(p => p.status === 'active'));
+            var tree = buildProjectTree(state.projects.filter(p => p.status !== 'dropped' && p.status !== 'completed' && p.status !== 'deleted'));
 
             function traverseTree(nodes, depth) {
                 nodes.forEach(function (node) {
