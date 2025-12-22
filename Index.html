@@ -2163,17 +2163,40 @@
                 var x = node.project;
                 var tc = state.tasks.filter(function (t) { return t.projectId === x.id && t.status !== 'done' && t.status !== 'deleted'; }).length;
                 var padding = level * 24;
+                var hasChildren = node.children && node.children.length > 0;
+                var isCollapsed = state.collapsed[x.id];
 
-                var style = 'margin-left: ' + padding + 'px; margin-bottom: 8px; padding: 12px; display: flex; align-items: center; gap: 12px;';
+                var style = 'margin-left: ' + padding + 'px; margin-bottom: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px;';
                 var icon = x.type === 'folder' ? 'folder_open' : 'folder';
 
+                var toggleHtml = '';
+                if (hasChildren) {
+                    var iconName = isCollapsed ? 'arrow_right' : 'arrow_drop_down';
+                    toggleHtml = '<span class="material-icons" onclick="event.stopPropagation(); toggleCollapse(\'' + x.id + '\')" style="cursor:pointer; font-size:20px; color:var(--text-muted); user-select:none;">' + iconName + '</span>';
+                } else {
+                    toggleHtml = '<span style="display:inline-block; width:20px;"></span>';
+                }
+
                 h += '<div class="project-card" onclick="openItemDialog(\'' + x.id + '\')" style="' + style + '">';
+                h += toggleHtml;
                 h += '<div class="task-checkbox" onclick="event.stopPropagation();completeProjectClick(\'' + x.id + '\')"></div>';
-                h += '<div style="flex: 1; font-weight: 600; font-size: 14px; color: var(--text-primary); display: flex; align-items: center;"><span class="material-icons" style="font-size: 18px; margin-right: 6px; color: var(--text-muted);">' + icon + '</span>' + esc(x.name) + '</div>';
-                h += '<div class="project-stats" style="margin-left: auto;">' + tc + ' tasks</div>';
+
+                // Content
+                h += '<div style="flex: 1; font-weight: 600; font-size: 14px; color: var(--text-primary); display: flex; align-items: center;">';
+                h += '<span class="material-icons" style="font-size: 18px; margin-right: 6px; color: var(--text-muted);">' + icon + '</span>';
+                h += esc(x.name) + '</div>';
+
+                // Right Side Actions
+                h += '<div style="display:flex; align-items:center; gap:8px; margin-left:auto;">';
+                h += '<div class="project-stats">' + tc + ' tasks</div>';
+                // Add Subproject Button
+                h += '<button class="btn-icon" onclick="event.stopPropagation(); openItemDialog(null, \'project\', \'' + x.id + '\')" title="Add Subproject" style="color:var(--text-muted); padding:4px;">';
+                h += '<span class="material-icons" style="font-size:18px;">add</span></button>';
                 h += '</div>';
 
-                if (node.children.length > 0) {
+                h += '</div>';
+
+                if (node.children.length > 0 && !isCollapsed) {
                     h += renderProjectTree(node.children, level + 1);
                 }
             });
