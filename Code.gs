@@ -3,23 +3,76 @@
  * Handles web app routing and initialization
  */
 
+
+
 /**
  * Serves the web app
+ * Dual-Mode:
+ * 1. Owner -> Full GTD App (Index)
+ * 2. Anonymous/Others -> Quick Capture Form (QuickCapture)
  */
 function doGet(e) {
   var params = e ? e.parameter : {};
-  var page = params.page || 'inbox';
   
-  if (page === 'debug') {
+  // Detect if the visitor is the Owner
+  // Session.getActiveUser().getEmail() is empty if anonymous or incognito
+  // Session.getEffectiveUser().getEmail() is always the script owner (Me)
+  // Note: This relies on "Execute as Me" deployment setting.
+  const activeUser = Session.getActiveUser().getEmail();
+  const title = (activeUser === Session.getEffectiveUser().getEmail()) ? 'GTD System' : 'Quick Capture';
+  
+  // Decide which page to show
+  // If Debug page requested AND user is owner, allow it.
+  if (params.page === 'debug' && activeUser === Session.getEffectiveUser().getEmail()) {
     return HtmlService.createHtmlOutputFromFile('DebugPage')
       .setTitle('GTD Debug')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (activeUser === Session.getEffectiveUser().getEmail() && params.page !== 'capture') {
+     // Owner -> Full App
+     return HtmlService.createHtmlOutputFromFile('Index')
+      .setTitle(title)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  } else {
+     // Anonymous/Public -> Simple Capture Form
+     return HtmlService.createHtmlOutputFromFile('QuickCapture')
+      .setTitle(title)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
-  
-  return HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('GTD System')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * Handle POST requests (WebHook for Quick Capture)
+ * Payload: { "key": "SECRET", "title": "...", "notes": "..." }
+ */
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return ContentService.createTextOutput(JSON.stringify({ error: 'No data' })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const data = JSON.parse(e.postData.contents);
+    const storedKey = PropertiesService.getScriptProperties().getProperty('API_SECRET');
+
+    // Simple security check
+    if (!storedKey || data.key !== storedKey) {
+       return ContentService.createTextOutput(JSON.stringify({ error: 'Invalid API Key' })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Create Task
+    const task = TaskService.createTask({
+      title: data.title || 'Quick Capture',
+      notes: data.notes || '',
+      status: 'inbox',
+      createdDate: new Date().toISOString()
+    });
+
+    return ContentService.createTextOutput(JSON.stringify({ success: true, id: task.id })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ error: err.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 /**
@@ -649,4 +702,25 @@ function createTaskWrapper(taskData) {
     type: taskData.type // Should always be 'task' here but good to pass
   });
   return { success: true, task: task };
+}
+
+/**
+ * Setup/View API Secret for Quick Capture
+ * Run this function manually to see your API Key
+ */
+function setupApiSecret() {
+  const props = PropertiesService.getScriptProperties();
+  let secret = props.getProperty('API_SECRET');
+  
+  if (!secret) {
+    secret = Utilities.getUuid();
+    props.setProperty('API_SECRET', secret);
+    Logger.log('Generated NEW API Secret: ' + secret);
+  } else {
+    Logger.log('Current API Secret: ' + secret);
+  }
+  
+  Logger.log('Quick Capture URL: ' + ScriptApp.getService().getUrl());
+  Logger.log('Use this in iOS Shortcuts/Zapier/curl with JSON: {"key": "...", "title": "..."}');
+  return secret;
 }
