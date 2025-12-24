@@ -724,3 +724,14 @@ function setupApiSecret() {
   Logger.log('Use this in iOS Shortcuts/Zapier/curl with JSON: {"key": "...", "title": "..."}');
   return secret;
 }
+
+/**
+ * Wrapper to convert a task to a project (User Request)
+ */
+function convertTaskToProjectWrapper(id) {
+  var result = TaskService.updateTask(id, {
+    type: 'project',
+    status: 'active'
+  });
+  return result;
+}

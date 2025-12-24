@@ -466,3 +466,5 @@ function onGmailMessageOpen(e) {
 function onGmailHomePageOpen(e) {
   return buildAddOnHomepage(e);
 }
+
+// End of GmailService.gs

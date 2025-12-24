@@ -156,6 +156,10 @@ const PRIORITY_WEIGHTS = {
   STAR_BONUS: 100 // Flat bonus for starred items
 };
 
+// AI Model Configuration
+const GEMINI_MODEL = 'auto'; // 'auto' keys dynamic detection, or specify e.g. 'gemini-1.5-pro'
+
+
 /**
  * Get the spreadsheet instance
  */

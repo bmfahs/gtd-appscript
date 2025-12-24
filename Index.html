@@ -846,6 +846,115 @@
         .queue-item.processing .status-icon {
             animation: spin 1s linear infinite;
         }
+
+        /* CAR MODE STYLES */
+        body.car-mode-active .sidebar,
+        body.car-mode-active .header {
+            display: none !important;
+        }
+
+        body.car-mode-active .main-container {
+            margin-top: 0;
+            height: 100vh;
+        }
+
+        body.car-mode-active .content {
+            margin-left: 0;
+            padding: 0;
+            background: #000;
+            color: #fff;
+            height: 100vh;
+        }
+
+        .car-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 24px;
+        }
+
+        .car-status {
+            text-align: center;
+            font-size: 20px;
+            color: #888;
+            margin-bottom: 24px;
+            min-height: 30px;
+        }
+
+        .car-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 16px;
+            flex: 1;
+            margin-bottom: 24px;
+        }
+
+        .car-btn {
+            background: #1e1e1e;
+            border: 2px solid #333;
+            border-radius: 16px;
+            color: #fff;
+            font-size: 22px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .car-btn:active {
+            background: #333;
+            transform: scale(0.98);
+        }
+
+        .car-btn .material-icons {
+            font-size: 48px;
+            color: var(--primary);
+        }
+
+        .car-mic-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .car-mic-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #ef4444;
+            /* Stop color */
+            border: none;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+
+        .car-mic-btn.listening {
+            background: #22c55e;
+            /* Listening green */
+            animation: pulse-green 1.5s infinite;
+        }
+
+        @keyframes pulse-green {
+            0% {
+                box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 20px rgba(34, 197, 94, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+            }
+        }
     </style>
 </head>
 
@@ -885,6 +994,10 @@
                     <option value="medium" selected>Medium Energy</option>
                     <option value="low">Low Energy</option>
                 </select>
+                <button onclick="navigateTo('car')" class="btn-icon" title="Car Mode"
+                    style="color:var(--text-secondary); margin-left:8px;">
+                    <span class="material-icons">directions_car</span>
+                </button>
             </div>
         </header>
         <div class="main-container">
@@ -1158,7 +1271,33 @@
             document.querySelectorAll('.nav-item').forEach(function (i) { i.classList.remove('active'); if (i.dataset.page === p) i.classList.add('active'); }); var sb = document.getElementById('sidebar'); if (sb) sb.classList.remove('open'); renderPage(p);
         }
         function toggleSidebar() { var sb = document.getElementById('sidebar'); if (sb) sb.classList.toggle('open'); }
-        function renderPage(p) { var c = document.getElementById('pageContent'); if (!c) return; var h = ''; if (p === 'inbox') h = renderInbox(); else if (p === 'next') h = renderNext(); else if (p === 'today') h = renderToday(); else if (p === 'scheduled') h = renderScheduled(); else if (p === 'waiting') h = renderWaiting(); else if (p === 'projects') h = renderProjects(); else if (p === 'someday') h = renderSomeday(); else if (p === 'review') h = renderReview(); else if (p === 'contexts') h = renderContexts(); else if (p === 'areas') h = renderAreas(); else if (p === 'attention') h = renderAttention(); else if (p === 'all') h = renderAllTasks(); else if (p === 'search') h = renderSearchResults(); else h = renderInbox(); c.innerHTML = h; }
+        function renderPage(p) {
+            if (p === 'car') document.body.classList.add('car-mode-active');
+            else document.body.classList.remove('car-mode-active');
+
+            var c = document.getElementById('pageContent');
+            if (!c) return;
+            var h = '';
+            if (p === 'inbox') h = renderInbox();
+            else if (p === 'next') h = renderNext();
+            else if (p === 'today') h = renderToday();
+            else if (p === 'scheduled') h = renderScheduled();
+            else if (p === 'waiting') h = renderWaiting();
+            else if (p === 'projects') h = renderProjects();
+            else if (p === 'someday') h = renderSomeday();
+            else if (p === 'review') h = renderReview();
+            else if (p === 'contexts') h = renderContexts();
+            else if (p === 'areas') h = renderAreas();
+            else if (p === 'attention') h = renderAttention();
+            else if (p === 'all') h = renderAllTasks();
+            else if (p === 'search') h = renderSearchResults();
+            else if (p === 'car') h = renderCarMode();
+            else h = renderInbox();
+            c.innerHTML = h;
+
+            // Auto-init speech if entering car mode
+            if (p === 'car') initSpeech();
+        }
 
         // Attention View Logic
         function getAttentionItems() {
@@ -3473,6 +3612,270 @@
                 var webUrl = 'https://mail.google.com/mail/u/0/#inbox/' + threadId;
                 window.open(webUrl, '_blank');
             }
+        }
+
+        /* CAR MODE & VOICE LOGIC */
+
+        function renderCarMode() {
+
+            var h = '<div class="car-container">';
+            h += '<div id="carStatus" class="car-status">Tap a button to start</div>';
+            h += '<div class="car-grid">';
+
+            // 1. Read Top 10
+            h += '<button class="car-btn" onclick="speakTopTasks()">';
+            h += '<span class="material-icons">play_circle</span>';
+            h += '<span>Read Tasks</span>';
+            h += '</button>';
+
+            // 2. AI Agent (Unified)
+            h += '<button class="car-btn" onclick="startVoiceCapture(\'agent\')">';
+            h += '<span class="material-icons">record_voice_over</span>';
+            h += '<span>Ask Gemini</span>';
+            h += '</button>';
+
+            // 3. Exit
+            h += '<button class="car-btn" onclick="navigateTo(\'inbox\')">';
+            h += '<span class="material-icons">exit_to_app</span>';
+            h += '<span>Exit</span>';
+            h += '</button>';
+
+            h += '</div>';
+
+            // Mic Control
+            h += '<div class="car-mic-container">';
+            h += '<button id="carMicBtn" class="car-mic-btn" onclick="stopSpeaking()">';
+            h += '<span class="material-icons">stop</span>';
+            h += '</button>';
+            h += '</div>';
+
+            h += '</div>';
+            return h;
+        }
+
+        var recognition;
+        var isListening = false;
+        var processingVoice = false; // Flag to prevent race conditions
+        var voiceMode = ''; // 'inbox', 'project'
+        var synth = window.speechSynthesis;
+
+        function initSpeech() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                showToast("Speech recognition not supported");
+                return;
+            }
+            var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+
+            recognition.onstart = function () {
+                isListening = true;
+                updateCarStatus('Listening...', true);
+            };
+
+            recognition.onend = function () {
+                isListening = false;
+                // Only show processing if we actually have a request in flight
+                if (processingVoice) {
+                    updateCarStatus('Processing...', false);
+                } else {
+                    // If we aren't processing (e.g. silence timeout without result), reset
+                    updateCarStatus('Tap to speak', false);
+                }
+            };
+
+            recognition.onresult = function (event) {
+                var text = event.results[0][0].transcript;
+                console.log('Voice Result:', text);
+                processingVoice = true; // Set flag BEFORE async handlers
+                handleVoiceResult(text);
+            };
+
+            recognition.onerror = function (event) {
+                console.error('Speech Error', event.error);
+                updateCarStatus('Error: ' + event.error, false);
+                speak("Sorry, I didn't catch that.");
+            };
+        }
+
+        function updateCarStatus(text, listening) {
+            var el = document.getElementById('carStatus');
+            if (el) el.textContent = text;
+            var btn = document.getElementById('carMicBtn');
+            if (btn) {
+                if (listening) {
+                    btn.classList.add('listening');
+                    btn.innerHTML = '<span class="material-icons">mic</span>';
+                } else {
+                    btn.classList.remove('listening');
+                    btn.innerHTML = '<span class="material-icons">stop</span>';
+                }
+            }
+        }
+
+        function startVoiceCapture(mode) {
+            if (!recognition) initSpeech();
+            voiceMode = mode;
+            if (synth.speaking) synth.cancel();
+
+            try {
+                recognition.start();
+            } catch (e) {
+                // key might already be started
+                recognition.stop();
+                setTimeout(function () { recognition.start(); }, 100);
+            }
+        }
+
+        function stopSpeaking() {
+            if (synth.speaking) synth.cancel();
+            if (isListening && recognition) recognition.stop();
+        }
+
+        function speak(text) {
+            if (synth.speaking) synth.cancel();
+            var utterance = new SpeechSynthesisUtterance(text);
+            synth.speak(utterance);
+        }
+
+        function handleVoiceResult(text) {
+            updateCarStatus('Heard: "' + text + '"', false);
+
+            if (voiceMode === 'inbox') {
+                // Add to Inbox
+                var tempId = 'temp-' + Date.now();
+                requestQueue.enqueue(
+                    'createTask',
+                    {
+                        title: text,
+                        notes: 'Added via Voice',
+                        status: 'inbox',
+                        type: 'task'
+                    },
+                    tempId,
+                    'Add Task: ' + text
+                );
+                speak("Added " + text + " to inbox.");
+            }
+            else if (voiceMode === 'agent') {
+                // Set Watchdog Timer (15s) in case server hangs/fails silently
+                var watchdogParam = setTimeout(function () {
+                    if (processingVoice) {
+                        console.warn('Voice Watchdog Triggered: No output from AI');
+                        processingVoice = false;
+                        updateCarStatus('AI Timeout. Try again.', false);
+                        speak("I'm sorry, that took too long.");
+                    }
+                }, 15000);
+
+                google.script.run
+                    .withSuccessHandler(function (result) {
+                        clearTimeout(watchdogParam); // Clear watchdog
+                        console.log('AI Action:', result);
+                        try {
+                            if (!result) throw new Error("Empty response from AI");
+                            handleAgentAction(result);
+                        } catch (err) {
+                            console.error('Client Handler Error:', err);
+                            speak("I had a problem handling that.");
+                        } finally {
+                            processingVoice = false; // GUARANTEE reset
+                            updateCarStatus('Tap to speak', false);
+                        }
+                    })
+                    .withFailureHandler(function (e) {
+                        clearTimeout(watchdogParam); // Clear watchdog
+                        console.error('AI Error', e);
+                        processingVoice = false;
+                        updateCarStatus('Error: ' + e.message, false);
+                        speak("I encountered an error.");
+                    })
+                    .processVoiceCommandWrapper(text);
+            }
+        }
+
+        function handleAgentAction(result) {
+            // Note: processingVoice flag is now managed by the caller (handleVoiceResult) via try/finally
+            // This simplifies this function to just handling logic without side-effect management
+            if (result.action === 'create') {
+                const data = result.data;
+                requestQueue.enqueue(
+                    'createTask',
+                    {
+                        title: data.title,
+                        notes: data.notes || '',
+                        projectId: data.projectId || null,
+                        status: 'inbox',
+                        type: 'task'
+                    },
+                    'voice-' + Date.now(),
+                    'AI: Create ' + data.title
+                );
+                speak("Created task " + data.title);
+            }
+            else if (result.action === 'convert') {
+                const targetId = result.targetId;
+                requestQueue.enqueue(
+                    'updateTask',
+                    { id: targetId, type: 'project', status: 'active' },
+                    null,
+                    'AI: Convert to Project'
+                );
+                speak("Converted task to project.");
+            }
+            else if (result.action === 'ai_plan') {
+                const targetId = result.targetId;
+                const name = result.projectName;
+                speak("Planning project " + name + ".");
+                google.script.run
+                    .withSuccessHandler(function (tasks) {
+                        if (tasks && tasks.length > 0) {
+                            speak("Adding " + tasks.length + " tasks.");
+                            tasks.forEach(title => {
+                                requestQueue.enqueue(
+                                    'createTask',
+                                    {
+                                        title: title,
+                                        projectId: targetId,
+                                        status: 'next',
+                                        type: 'task'
+                                    },
+                                    'ai-' + Date.now() + Math.random(),
+                                    'AI Task: ' + title
+                                );
+                            });
+                        } else {
+                            speak("No suggestions generated.");
+                        }
+                    })
+                    .suggestProjectTasksWrapper(targetId);
+            }
+            else {
+                speak(result.message || "I didn't understand that.");
+            }
+            // State management moved to handleVoiceResult finally block
+        }
+
+        function speakTopTasks() {
+            var tasks = state.tasks.filter(t => t.status === 'next');
+            // Sort by Score
+            tasks.sort(function (a, b) {
+                return calculateTaskScore(b) - calculateTaskScore(a);
+            });
+            var top = tasks.slice(0, 5); // Read top 5
+
+            if (top.length === 0) {
+                speak("No next actions.");
+                return;
+            }
+
+            var text = "Here are your top " + top.length + " tasks. ";
+            top.forEach((t, i) => {
+                text += (i + 1) + ". " + t.title + ". ";
+            });
+            speak(text);
         }
     </script>
 </body>
