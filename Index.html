@@ -2670,10 +2670,9 @@
                 d.scheduledDate = document.getElementById('itemScheduledDate').value;
 
                 // Parent Mapping
-                d.projectId = parentId; // For tasks, we treat the parent container as the project
-                d.parentTaskId = ''; // Reset subtask nesting if moved to project root? 
-                // Advanced: if we wanted to support subtasks, we'd need to know if parentId is a Task or Project.
-                // For now, simplifed: Parent is always a Project/Folder.
+                // FIX: Use parentTaskId directly for all hierarchy adjustments
+                d.parentTaskId = parentId;
+                // d.projectId = parentId; // Legacy
             } else {
                 // Project or Folder
                 // DB expects 'name' and 'description' for legacy component?
@@ -3058,7 +3057,7 @@
 
                 // Project
                 var proj = el.querySelector('.fix-project');
-                if (proj && proj.value) { u.projectId = proj.value; hasUpdates = true; }
+                if (proj && proj.value) { u.parentTaskId = proj.value; hasUpdates = true; }
 
                 // Context
                 var ctx = el.querySelector('.fix-context');

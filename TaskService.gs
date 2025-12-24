@@ -156,6 +156,11 @@ const TaskService = {
     const task = this.rowToTask(data);
     
     // Apply updates
+    // Phase 1: Map legacy projectId update to parentTaskId
+    if (updates.projectId !== undefined && updates.parentTaskId === undefined) {
+      updates.parentTaskId = updates.projectId;
+    }
+
     Object.assign(task, updates);
     task.modifiedDate = now();
     
