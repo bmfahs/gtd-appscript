@@ -34,9 +34,18 @@ A personal productivity application based on the Getting Things Done (GTD) metho
     - Labels actionable emails as `GTD/Suggested`.
 - **Gmail Import**: Import emails labeled `GTD/ToProcess` directly as tasks.
 
+### Smart Categorization (New!)
+- **Keyboard Shortcuts (Vim-style)**: Rapidly set metadata without mousing.
+    - `p` (Project), `c` (Context), `t` (Time), `d` (Due).
+    - Toggle values: `i` (Importance), `u` (Urgency), `e` (Energy).
+- **Magic Wand (AI)**:
+    - Type a task description and press `Cmd+J`.
+    - Gemini automatically infers Context, Project, Importance, Urgency, and Time Estimate from your text.
+
 ### Advanced
-- **Search**: Hierarchical search for tasks and projects.
-- **Export**: Download your completed task history to CSV.
+- **Search**:
+    - **Visual Hierarchy**: Search results show parent projects indented for context (e.g. `Bar > Foo`).
+- **Export**: Download your completed task history to CSV (now with date-stamped filenames).
 - **Database Compaction**: Clean up deleted items to keep the app fast.
 
 ## Prerequisites

@@ -164,6 +164,50 @@ const GeminiService = (function() {
   }
 
   /**
+   * Analyzes a task string to infer metadata (Context, Project, Importance, Urgency).
+   * @param {string} text - The raw task description (e.g. "Buy milk")
+   * @param {Array} contextList - List of {id, name}
+   * @param {Array} projectList - List of {id, name}
+   */
+  function analyzeTaskString(text, contextList, projectList) {
+    const key = getApiKey();
+    if (!key) throw new Error('GEMINI_API_KEY missing');
+
+    const prompt = `
+      You are a GTD Assistant.
+      User Input: "${text}"
+      
+      Analyze the input and infer the best metadata from the available options.
+      
+      AVAILABLE CONTEXTS:
+      ${JSON.stringify(contextList.map(c => ({ id: c.id, name: c.name })))}
+      
+      AVAILABLE PROJECTS:
+      ${JSON.stringify(projectList.map(p => ({ id: p.id, name: p.name })))}
+      
+      INSTRUCTIONS:
+      1. Importance/Urgency: Rate 1-5 (1=Low, 3=Normal, 5=Top) based on semantics (e.g. "Create Urgent Report" = Urg: 5). Default to 3 if neutral.
+      2. Context: Pick the best matching ID from the list. If no good match, return null.
+      3. Project: Pick the best matching ID. If no good match, return null.
+      4. Energy: "low", "medium", or "high".
+      5. Time: Estimate minutes (integer).
+      
+      OUTPUT JSON ONLY:
+      {
+        "importance": "string (1-5)",
+        "urgency": "string (1-5)",
+        "energyRequired": "string (low/medium/high)",
+        "timeEstimate": "string (minutes)",
+        "contextId": "string (ID or null)",
+        "projectId": "string (ID or null)",
+        "title": "Cleaned Title (optional, remove metadata text if any)"
+      }
+    `;
+
+    return callGemini(prompt, key);
+  }
+
+  /**
    * Process a natural language voice command with full system context.
    */
   function processVoiceCommand(transcript) {
@@ -226,6 +270,7 @@ const GeminiService = (function() {
 
   return {
     suggestTasksForProject: suggestTasksForProject,
+    analyzeTaskString: analyzeTaskString,
     processVoiceCommand: processVoiceCommand
   };
 

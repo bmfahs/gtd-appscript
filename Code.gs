@@ -729,6 +729,27 @@ function setupApiSecret() {
 }
 
 /**
+ * AI Smart Categorization Wrapper
+ * Called by client to infer metadata from text.
+ */
+function analyzeTaskWrapper(text) {
+  // 1. Get Context (Projects & Contexts)
+  // We only send minimal data (id + name) to save tokens context window
+  var projects = ProjectService.getActiveProjects().map(function(p) {
+    return { id: p.id, name: p.name };
+  });
+  
+  var contexts = ContextService.getAllContexts().map(function(c) {
+    return { id: c.id, name: c.name };
+  });
+
+  // 2. Call Gemini
+  var analysis = GeminiService.analyzeTaskString(text, contexts, projects);
+  
+  return analysis;
+}
+
+/**
  * Wrapper to convert a task to a project (User Request)
  */
 function convertTaskToProjectWrapper(id) {

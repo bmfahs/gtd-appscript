@@ -1077,6 +1077,10 @@
                             style="color:var(--text-muted);">
                             <span class="material-icons" id="itemStarIcon">star_border</span>
                         </button>
+                        <button class="btn-icon" id="itemMagicBtn" onclick="performSmartAnalysis()"
+                            title="Smart Categorization (Cmd+J)" style="color:var(--primary);">
+                            <span class="material-icons">auto_fix_high</span>
+                        </button>
                     </div>
                     <button class="btn-icon" onclick="closeItemDialog()"><span
                             class="material-icons">close</span></button>
@@ -3877,6 +3881,161 @@
                 text += (i + 1) + ". " + t.title + ". ";
             });
             speak(text);
+        }
+        function performSmartAnalysis() {
+            var title = document.getElementById('itemTitle').value;
+            var notes = document.getElementById('itemNotes').value;
+            var text = title + " " + notes;
+
+            if (!text.trim()) {
+                showToast("Please enter a title first.");
+                return;
+            }
+
+            // Visual feedback
+            var btn = document.getElementById('itemMagicBtn');
+            btn.classList.add('spinning'); // Assume spinning class exists or add it
+            showToast("Gemini is thinking...");
+
+            google.script.run
+                .withSuccessHandler(function (data) {
+                    btn.classList.remove('spinning');
+                    if (!data) return;
+
+                    // Populate fields
+                    if (data.importance) document.getElementById('itemImportance').value = data.importance;
+                    if (data.urgency) document.getElementById('itemUrgency').value = data.urgency;
+                    if (data.energyRequired) document.getElementById('itemEnergy').value = data.energyRequired;
+                    if (data.timeEstimate) document.getElementById('itemTimeEstimate').value = data.timeEstimate;
+
+                    if (data.contextId) document.getElementById('itemContext').value = data.contextId;
+
+                    if (data.projectId) {
+                        document.getElementById('itemParent').value = data.projectId;
+                        // Need to update display text too
+                        var p = state.projects.find(x => x.id === data.projectId);
+                        if (p) document.getElementById('itemParentDisplay').value = p.name;
+                    }
+
+                    showToast("Categorized!");
+                })
+                .withFailureHandler(function (e) {
+                    btn.classList.remove('spinning');
+                    showToast("Error: " + e);
+                })
+                .analyzeTaskWrapper(text);
+        }
+
+        // Global Shortcuts
+        document.addEventListener('keydown', function (e) {
+            // 1. Smart Analysis (Global)
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+                e.preventDefault();
+                performSmartAnalysis();
+                return;
+            }
+
+            // 2. Ignore regular typing
+            var active = document.activeElement;
+            if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable) {
+                if (e.key === 'Escape') {
+                    if (document.getElementById('itemDialog').style.display !== 'none') {
+                        closeItemDialog();
+                    }
+                    active.blur(); // Also blur inputs in list view
+                    e.preventDefault();
+                }
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                    // Check if in dialog
+                    if (document.getElementById('itemDialog').style.display !== 'none') {
+                        saveItem();
+                    } else {
+                        // If in bulk list, maybe save inbox updates?
+                        saveInboxUpdates();
+                    }
+                    e.preventDefault();
+                }
+                return;
+            }
+
+            var dialogOpen = document.getElementById('itemDialog').style.display !== 'none';
+
+            // 3. Categorization Shortcuts
+            var key = e.key.toLowerCase();
+            if (['p', 'c', 'i', 'u', 'e', 't', 'd', 's'].includes(key)) {
+                e.preventDefault();
+
+                if (dialogOpen) {
+                    // DIALOG MODE
+                    switch (key) {
+                        case 'p': document.getElementById('itemParentDisplay').focus(); break;
+                        case 'c': document.getElementById('itemContext').focus(); break;
+                        case 'i': cycleSelect('itemImportance', ['', '1', '2', '3', '4', '5']); break;
+                        case 'u': cycleSelect('itemUrgency', ['', '1', '2', '3', '4', '5']); break;
+                        case 'e': cycleSelect('itemEnergy', ['', 'low', 'medium', 'high']); break;
+                        case 't': document.getElementById('itemTimeEstimate').focus(); break;
+                        case 'd': document.getElementById('itemDueDate').focus(); break;
+                        case 's': document.getElementById('itemScheduledDate').focus(); break;
+                    }
+                } else {
+                    // LIST MODE (Bulk Edit)
+                    var items = getVisibleItems();
+                    if (state.selectedIndex >= 0 && state.selectedIndex < items.length) {
+                        var row = items[state.selectedIndex];
+                        switch (key) {
+                            case 'p':
+                                var el = row.querySelector('.fix-project-display');
+                                if (el) el.focus();
+                                break;
+                            case 'c':
+                                var el = row.querySelector('.fix-context');
+                                if (el) el.focus();
+                                break;
+                            case 'i':
+                                var el = row.querySelector('.fix-importance');
+                                if (el) cycleSelect(el, ['', '1', '2', '3', '4', '5']);
+                                break;
+                            case 'u':
+                                var el = row.querySelector('.fix-urgency');
+                                if (el) cycleSelect(el, ['', '1', '2', '3', '4', '5']);
+                                break;
+                            case 'e':
+                                var el = row.querySelector('.fix-energy');
+                                if (el) cycleSelect(el, ['', 'low', 'medium', 'high']);
+                                break;
+                            case 't':
+                                var el = row.querySelector('.fix-time');
+                                if (el) el.focus();
+                                break;
+                            case 'd':
+                                var el = row.querySelector('.fix-due');
+                                if (el) el.focus();
+                                break;
+                            case 's':
+                                var el = row.querySelector('.fix-scheduled');
+                                if (el) el.focus();
+                                break;
+                        }
+                    }
+                }
+            }
+        });
+
+        function cycleSelect(idOrEl, values) {
+            var el = (typeof idOrEl === 'string') ? document.getElementById(idOrEl) : idOrEl;
+            if (!el) return;
+            var current = el.value;
+            // Handle number/string mismatch
+            var idx = values.findIndex(v => v == current);
+            if (idx === -1) idx = 0;
+
+            var nextIdx = (idx + 1) % values.length;
+            el.value = values[nextIdx];
+
+            // Visual feedback
+            el.style.transition = 'background-color 0.2s';
+            el.style.backgroundColor = 'var(--bg-highlight)';
+            setTimeout(() => { el.style.backgroundColor = ''; }, 200);
         }
     </script>
 </body>
