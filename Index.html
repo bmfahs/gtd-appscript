@@ -2847,7 +2847,8 @@
                 var url = window.URL.createObjectURL(blob);
                 var a = document.createElement('a');
                 a.href = url;
-                a.download = 'completed_log.csv';
+                var dateStr = new Date().toISOString().split('T')[0];
+                a.download = 'gtd_completed_log_' + dateStr + '.csv';
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
