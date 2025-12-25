@@ -2344,10 +2344,10 @@
         }
         function renderSomeday() { var t = state.tasks.filter(function (x) { return x.status === 'someday'; }); var h = '<div class="page-header"><h2>Someday/Maybe</h2><p>Ideas for the future</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">cloud</span><h3>Dream Big</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
         function renderReview() {
-            var ic = state.tasks.filter(function (x) { return x.status === 'inbox'; }).length;
             var h = '<div class="page-header"><h2>Weekly Review</h2><p>Get clear, current, creative</p></div>';
-            h += '<div class="review-section"><h3><span class="material-icons">inbox</span> Process Inbox</h3><p>' + (ic > 0 ? ic + ' items' : 'Empty!') + '</p>' + (ic > 0 ? '<button class="btn btn-primary" onclick="navigateTo(\'inbox\')">Process</button>' : '') + '</div>';
-            h += '<div class="review-section"><h3><span class="material-icons">folder</span> Review Projects</h3><button class="btn btn-secondary" onclick="navigateTo(\'projects\')">Review</button></div>';
+
+            // Removed redundant point-off links (Inbox, Projects) per user request
+
             h += '<div class="review-section"><h3><span class="material-icons">download</span> Export Data</h3><p>Download a log of all completed tasks and projects.</p><div style="display:flex; gap:8px"><button class="btn btn-secondary" onclick="downloadExport()">Export Log</button><button class="btn btn-danger" onclick="compactDatabaseClick()">Compact Database</button></div></div>';
             return h;
         }
