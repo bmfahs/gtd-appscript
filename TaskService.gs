@@ -119,7 +119,10 @@ const TaskService = {
       parentTaskId: taskData.parentTaskId || taskData.projectId || '',
       sortOrder: taskData.sortOrder || this.getNextSortOrder(),
       type: taskData.type || TASK_TYPE.TASK,
-      areaId: taskData.areaId || ''
+      areaId: taskData.areaId || '',
+      importance: taskData.importance || '',
+      urgency: taskData.urgency || '',
+      isStarred: taskData.isStarred || false
     };
     
     // Calculate priority if it's a task

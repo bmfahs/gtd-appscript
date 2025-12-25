@@ -699,7 +699,10 @@ function createTaskWrapper(taskData) {
     dueDate: taskData.dueDate,
     scheduledDate: taskData.scheduledDate,
     parentTaskId: taskData.parentTaskId, // Allow creating subtasks if needed
-    type: taskData.type // Should always be 'task' here but good to pass
+    type: taskData.type, // Should always be 'task' here but good to pass
+    importance: taskData.importance,
+    urgency: taskData.urgency,
+    isStarred: taskData.isStarred
   });
   return { success: true, task: task };
 }
