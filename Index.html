@@ -3476,6 +3476,10 @@
                                     console.log('Updating state.currentItem reference to real object');
                                     state.currentItem = realObj;
                                 }
+                            } else {
+                                // Not found via tempId (wasn't optimistically added)? Add it now!
+                                console.log('Syncing new item from server to local state:', realObj);
+                                collection.push(realObj);
                             }
                         }
 
