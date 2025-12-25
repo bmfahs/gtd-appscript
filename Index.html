@@ -1750,7 +1750,7 @@
             // Row 2: Type | Project | Context | Importance | Urgency
             // Row 3: Due | Scheduled | Time | Energy
 
-            var h = '<div class="task-item fix-item" data-id="' + t.id + '" style="flex-direction:column; align-items:stretch; gap:8px; cursor:default; padding:12px;">';
+            var h = '<div class="task-item fix-item" data-id="' + t.id + '" onclick="openItemDialog(\'' + t.id + '\')" style="flex-direction:column; align-items:stretch; gap:8px; cursor:default; padding:12px;">';
 
             // --- Row 1: Star | Title | Status ---
             h += '<div style="display:flex; align-items:center; gap:8px;">';
