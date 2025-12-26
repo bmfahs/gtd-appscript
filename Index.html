@@ -1046,6 +1046,7 @@
                     </a>
                     <a href="#" class="nav-item" data-page="review" onclick="navigateTo('review'); return false;">
                         <span class="material-icons">rate_review</span><span>Weekly Review</span>
+                        <span class="badge" id="reviewBadge"></span>
                     </a>
                 </div>
                 <div class="nav-section">
@@ -1174,10 +1175,15 @@
                     </div>
 
                     <!-- Project/Folder Specific Fields -->
-                    <div id="projectFields" style="display:none">
+                    <div id="projectFields" style="display:none;">
                         <div class="form-group">
-                            <label for="itemArea">Area</label>
+                            <label for="itemArea">Area of Responsibility</label>
                             <select id="itemArea" class="form-control"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="itemCadence">Review Frequency (Weeks)</label>
+                            <input type="number" id="itemCadence" class="form-control" min="1" value="1"
+                                placeholder="1 = Weekly">
                         </div>
                     </div>
 
@@ -1238,6 +1244,7 @@
             updateInboxBadge();
             updateNextActionsBadge();
             updateAttentionBadge();
+            updateReviewBadge();
 
             populateSelects(); navigateTo(state.currentPage); showLoading(false);
         }
@@ -1374,6 +1381,24 @@
             });
 
             return { stalledProjects: stalledProjects, malformedTasks: malformedTasks };
+        }
+
+        function updateReviewBadge() {
+            var b = document.getElementById('reviewBadge');
+            if (!b) return;
+
+            if (!state.projects) return;
+
+            var count = 0;
+            try {
+                count = state.projects.filter(function (p) {
+                    return (p.status === 'active' || p.status === 'someday') && isReviewDue(p);
+                }).length;
+            } catch (e) {
+                console.error('UpdateReviewBadge Error: ' + e);
+            }
+
+            b.textContent = count > 0 ? count : '';
         }
 
         function updateAttentionBadge() {
@@ -2343,12 +2368,76 @@
             return h;
         }
         function renderSomeday() { var t = state.tasks.filter(function (x) { return x.status === 'someday'; }); var h = '<div class="page-header"><h2>Someday/Maybe</h2><p>Ideas for the future</p></div>'; if (t.length === 0) h += '<div class="empty-state"><span class="material-icons">cloud</span><h3>Dream Big</h3></div>'; else { h += '<div class="task-list">'; t.forEach(function (x) { h += taskItem(x); }); h += '</div>'; } return h; }
+        function isReviewDue(item) {
+            if (!item.lastReviewed) return true; // Never reviewed
+
+            var last = new Date(item.lastReviewed);
+            var now = new Date();
+            var diffDays = (now - last) / (1000 * 60 * 60 * 24);
+
+            // Cadence is in weeks (default 1)
+            var weeks = parseInt(item.reviewCadence) || 1;
+            var limitDays = weeks * 7;
+
+            return diffDays >= limitDays;
+        }
+
+        function markReviewed(id) {
+            // Optimistic Update
+            var item = state.tasks.find(x => x.id === id) || state.projects.find(x => x.id === id); // search both just in case, though projects are in tasks
+            if (item) {
+                item.lastReviewed = new Date().toISOString().split('T')[0];
+                renderPage('review');
+                requestQueue.enqueue('markReviewedWrapper', { id: id }, null, 'Review: ' + (item.title || item.name));
+            }
+        }
+
+
         function renderReview() {
-            var h = '<div class="page-header"><h2>Weekly Review</h2><p>Get clear, current, creative</p></div>';
+            var h = '<div class="page-header"><h2>Weekly Review</h2><p>Stay on top of your commitments</p></div>';
 
-            // Removed redundant point-off links (Inbox, Projects) per user request
+            // 1. Projects Due for Review
+            // Filter: items with type='project' OR type='folder'? 
+            // Current model: Projects are tasks with type='project'. state.projects is a derived view of them.
+            // We iterate state.projects as it contains the relevant items.
+            var dueProjects = state.projects.filter(function (p) {
+                return (p.status === 'active' || p.status === 'someday') && isReviewDue(p);
+            });
 
-            h += '<div class="review-section"><h3><span class="material-icons">download</span> Export Data</h3><p>Download a log of all completed tasks and projects.</p><div style="display:flex; gap:8px"><button class="btn btn-secondary" onclick="downloadExport()">Export Log</button><button class="btn btn-danger" onclick="compactDatabaseClick()">Compact Database</button></div></div>';
+            // Sort by "Most Overdue" (simplest proxy: lastReviewed date ascending)
+            dueProjects.sort(function (a, b) {
+                if (!a.lastReviewed) return -1;
+                if (!b.lastReviewed) return 1;
+                return new Date(a.lastReviewed) - new Date(b.lastReviewed);
+            });
+
+            h += '<div class="review-section"><h3><span class="material-icons" style="color:var(--text-danger)">timer</span> Due for Review (' + dueProjects.length + ')</h3>';
+
+            if (dueProjects.length === 0) {
+                h += '<p style="color:var(--text-muted); font-style:italic;">All caught up! Great job.</p>';
+            } else {
+                h += '<div class="task-list">';
+                dueProjects.forEach(function (p) {
+                    var icon = p.type === 'folder' ? 'folder' : 'assignment';
+                    var lastStr = p.lastReviewed ? p.lastReviewed : 'Never';
+                    var weeks = parseInt(p.reviewCadence) || 1;
+                    var cadenceStr = weeks === 1 ? 'Weekly' : (weeks + ' weeks');
+
+                    h += '<div class="task-item">';
+                    h += '<span class="material-icons" style="margin-right:12px; color:var(--text-muted)">' + icon + '</span>';
+                    h += '<div class="task-content" onclick="openItemDialog(\'' + p.id + '\')">';
+                    h += '<div class="task-title">' + esc(p.name) + '</div>';
+                    h += '<div class="task-meta">Last: ' + lastStr + ' &bull; ' + cadenceStr + '</div>';
+                    h += '</div>';
+                    // Mark Reviewed Button
+                    h += '<button class="btn-icon" onclick="markReviewed(\'' + p.id + '\')" title="Mark Reviewed"><span class="material-icons" style="color:var(--text-success)">check_circle</span></button>';
+                    h += '</div>';
+                });
+                h += '</div>';
+            }
+            h += '</div>';
+
+            h += '<div class="review-section"><h3><span class="material-icons">download</span> Export & Maintenance</h3><div style="display:flex; gap:8px"><button class="btn btn-secondary" onclick="downloadExport()">Export Log</button><button class="btn btn-danger" onclick="compactDatabaseClick()">Compact Database</button></div></div>';
             return h;
         }
         function renderContexts() { var h = '<div class="page-header"><h2>Contexts</h2><p>Where you can do tasks</p></div><div class="task-list">'; state.contexts.forEach(function (c) { var n = state.tasks.filter(function (t) { return t.contextId === c.id && t.status === 'next'; }).length; h += '<div class="task-item"><span class="context-icon">' + c.icon + '</span><div class="task-content"><div class="task-title">' + esc(c.name) + '</div></div><span class="task-meta">' + n + ' next</span></div>'; }); h += '</div><button class="add-btn" onclick="addContext()"><span class="material-icons">add</span> Add Context</button>'; return h; }
@@ -2524,6 +2613,7 @@
 
                 // Project specifics
                 document.getElementById('itemArea').value = item.areaId || '';
+                document.getElementById('itemCadence').value = item.reviewCadence || '1';
 
                 // Common
                 document.getElementById('itemDueDate').value = item.dueDate || '';
@@ -2641,7 +2731,8 @@
                 notes: document.getElementById('itemNotes').value,
                 status: document.getElementById('itemStatus').value,
                 type: type,
-                dueDate: document.getElementById('itemDueDate').value
+                dueDate: document.getElementById('itemDueDate').value,
+                reviewCadence: document.getElementById('itemCadence').value
             };
 
             // Parent ID
@@ -3438,6 +3529,7 @@
                             case 'convertTask': run.convertTaskToProject(data.id); break;
                             case 'completeTask': run.completeTask(data.id); break;
                             case 'completeProject': run.completeProject(data.id); break;
+                            case 'markReviewedWrapper': run.markReviewedWrapper(data.id); break;
 
                             default: reject('Unknown operation');
                         }
@@ -3525,6 +3617,7 @@
                             // Explicitly update badges
                             if (typeof updateInboxBadge === 'function') updateInboxBadge();
                             if (typeof updateAttentionBadge === 'function') updateAttentionBadge();
+                            if (typeof updateReviewBadge === 'function') updateReviewBadge();
                             if (typeof updateNextActionsBadge === 'function') updateNextActionsBadge();
                         } catch (e) { console.error('Render error:', e); }
                     } else {

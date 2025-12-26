@@ -92,6 +92,8 @@ const ProjectService = {
     if (updates.sortOrder !== undefined) taskUpdates.sortOrder = updates.sortOrder;
     if (updates.parentProjectId !== undefined) taskUpdates.parentTaskId = updates.parentProjectId;
     if (updates.type !== undefined) taskUpdates.type = updates.type;
+    if (updates.reviewCadence !== undefined) taskUpdates.reviewCadence = updates.reviewCadence;
+    if (updates.lastReviewed !== undefined) taskUpdates.lastReviewed = updates.lastReviewed;
     
     const result = TaskService.updateTask(projectId, taskUpdates);
     
@@ -191,7 +193,9 @@ const ProjectService = {
       sortOrder: task.sortOrder,
       parentProjectId: task.parentTaskId, // Parent Task IS Parent Project
       type: task.type || TASK_TYPE.PROJECT,
-      scheduledDate: task.scheduledDate
+      scheduledDate: task.scheduledDate,
+      reviewCadence: task.reviewCadence,
+      lastReviewed: task.lastReviewed
     };
   }
 };

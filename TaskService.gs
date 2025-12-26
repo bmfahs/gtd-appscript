@@ -387,7 +387,9 @@ const TaskService = {
       areaId: row[TASK_COLS.AREA_ID] || '',
       importance: row[TASK_COLS.IMPORTANCE] || '',
       urgency: row[TASK_COLS.URGENCY] || '',
-      isStarred: row[TASK_COLS.IS_STARRED] === true || row[TASK_COLS.IS_STARRED] === 'true'
+      isStarred: row[TASK_COLS.IS_STARRED] === true || row[TASK_COLS.IS_STARRED] === 'true',
+      lastReviewed: safeFormatDate(row[TASK_COLS.LAST_REVIEWED]),
+      reviewCadence: parseInt(row[TASK_COLS.REVIEW_CADENCE]) || 1 // Default to 1 week if missing/invalid
     };
   },
   
@@ -425,6 +427,8 @@ const TaskService = {
     row[TASK_COLS.IMPORTANCE] = task.importance;
     row[TASK_COLS.URGENCY] = task.urgency;
     row[TASK_COLS.IS_STARRED] = task.isStarred;
+    row[TASK_COLS.LAST_REVIEWED] = task.lastReviewed;
+    row[TASK_COLS.REVIEW_CADENCE] = task.reviewCadence;
     return row;
   }
 };

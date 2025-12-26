@@ -103,6 +103,8 @@ function initializeSystem() {
     projects.setFrozenRows(1);
   }
   
+
+  
   // Create Contexts sheet if missing
   if (!ss.getSheetByName(SHEETS.CONTEXTS)) {
     const contexts = ss.insertSheet(SHEETS.CONTEXTS);
@@ -758,4 +760,14 @@ function convertTaskToProjectWrapper(id) {
     status: 'active'
   });
   return result;
+}
+
+/**
+ * Wrapper to mark an item as reviewed
+ */
+function markReviewedWrapper(id) {
+    var today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    return TaskService.updateTask(id, {
+        lastReviewed: today
+    });
 }

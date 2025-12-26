@@ -40,7 +40,13 @@ A personal productivity application based on the Getting Things Done (GTD) metho
     - Toggle values: `i` (Importance), `u` (Urgency), `e` (Energy).
 - **Magic Wand (AI)**:
     - Type a task description and press `Cmd+J`.
+    - Type a task description and press `Cmd+J`.
     - Gemini automatically infers Context, Project, Importance, Urgency, and Time Estimate from your text.
+
+### Customizable Weekly Review
+- **Numeric Cadence**: Set custom review intervals for any project (e.g., `1` week, `4` weeks, `52` weeks).
+- **Due for Review Dashboard**: Automatically surfaces projects that are "stale" based on your custom cadence.
+- **Smart Backfill**: Initializes review dates based on activity so you aren't overwhelmed by "overdue" items on day one.
 
 ### Advanced
 - **Search**:

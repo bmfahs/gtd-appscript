@@ -157,3 +157,91 @@ function runPhase2ClearColumn() {
 function runPhase3Deletion() {
   return UpgradeService.deleteProjectIdColumn();
 }
+
+/**
+ * Weekly Review Schema Migration
+ */
+function runReviewSchemaMigration() {
+    return UpgradeService.addReviewColumns();
+}
+
+// Append new function to service
+Object.assign(UpgradeService, {
+    addReviewColumns: function() {
+        const sheet = getSheet(SHEETS.TASKS);
+        if (!sheet) return { success: false, error: 'Tasks sheet not found' };
+        
+        const lastCol = sheet.getLastColumn();
+        const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+        let added = [];
+        
+        // 1. lastReviewed
+        let lastReviewedIndex = headers.indexOf('lastReviewed');
+        if (lastReviewedIndex === -1) {
+            lastReviewedIndex = lastCol + added.length;
+            sheet.getRange(1, lastReviewedIndex + 1).setValue('lastReviewed');
+            added.push('lastReviewed');
+        }
+        
+        // 2. reviewCadence
+        if (headers.indexOf('reviewCadence') === -1) {
+            sheet.getRange(1, lastCol + added.length + 1).setValue('reviewCadence');
+            added.push('reviewCadence');
+        }
+
+        // 3. Backfill Data (Initialize lastReviewed)
+        // Only run if we actually added the column OR if we want to ensure data integrity
+        // Let's run it if we added columns, to be safe.
+        if (added.length > 0) {
+            const data = sheet.getDataRange().getValues();
+            // Find indices
+            const modifiedDateIndex = headers.indexOf('modifiedDate');
+            const createdDateIndex = headers.indexOf('createdDate');
+            
+            // We need to write back to the new 'lastReviewed' column
+            // It's at 'lastReviewedIndex' (0-based)
+            
+            const updates = [];
+            
+            // Start at row 1 (skip header)
+            for (let i = 1; i < data.length; i++) {
+                const row = data[i];
+                // Check if existing value is empty
+                // Note: If we just added the column, it's definitely empty (or undefined in memory)
+                // But data[] might not include the new column yet if we fetched it before setValue?
+                // We fetched 'headers' before, but 'data' logic below relies on re-fetching or assuming structure?
+                // Let's re-fetch data to include new empty columns if we want to benefit from array alignment, 
+                // OR just use the indices we know.
+                
+                // Better: Just build a column array to write.
+                
+                let val = '';
+                // Try modifiedDate
+                if (modifiedDateIndex !== -1 && row[modifiedDateIndex]) {
+                    val = row[modifiedDateIndex];
+                } 
+                // Fallback createdDate
+                else if (createdDateIndex !== -1 && row[createdDateIndex]) {
+                    val = row[createdDateIndex];
+                }
+                // Fallback Today
+                else {
+                    val = new Date();
+                }
+                
+                updates.push([val]);
+            }
+            
+            if (updates.length > 0) {
+                try {
+                    sheet.getRange(2, lastReviewedIndex + 1, updates.length, 1).setValues(updates);
+                    return { success: true, added: added, message: 'Schema updated and backfilled ' + updates.length + ' rows.' };
+                } catch(e) {
+                    return { success: false, error: 'Backfill failed: ' + e.toString() };
+                }
+            }
+        }
+        
+        return { success: true, added: added };
+    }
+});
