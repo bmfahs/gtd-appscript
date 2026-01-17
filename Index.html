@@ -3174,74 +3174,100 @@
 
             items.forEach(function (el) {
                 var id = el.dataset.id;
+                // Find original in State (Tasks or Projects?)
+                // Inbox items are technically tasks or projects, but usually tasks in 'inbox' status.
+                // state.tasks should have it.
+                var original = state.tasks.find(function (t) { return t.id === id; });
+                // Fallback to projects if not found (e.g. if we rendered a project in inbox?)
+                if (!original) original = state.projects.find(function (p) { return p.id === id; });
+
+                if (!original) return;
+
                 var u = {};
                 var hasUpdates = false;
 
+                function isChanged(newVal, oldVal) {
+                    var n = newVal || '';
+                    var o = oldVal || '';
+                    // Handle type loose equality if needed, but strings should match
+                    return n != o;
+                }
+
                 // Type
                 var type = el.querySelector('.fix-type');
-                if (type && type.value) {
+                var originalType = original.type || 'task';
+                if (type && type.value && type.value !== originalType) {
                     u.type = type.value;
                     hasUpdates = true;
 
                     // Auto-set status to 'active' if converting to Project/Folder and status is not explicitly set or remains 'inbox'
-                    // Check if status is being updated
                     var stat = el.querySelector('.fix-status');
                     var statusValue = stat ? stat.value : '';
-
                     if ((type.value === 'project' || type.value === 'folder') && (!statusValue || statusValue === 'inbox')) {
                         u.status = 'active';
                     }
                 }
 
-                // Project
+                // Project (Parent)
                 var proj = el.querySelector('.fix-project');
-                if (proj && proj.value) { u.parentTaskId = proj.value; hasUpdates = true; }
+                if (proj && isChanged(proj.value, original.projectId) && isChanged(proj.value, original.parentTaskId)) {
+                    // Check against BOTH projectId and parentTaskId to be safe, or just mapped one?
+                    // Frontend 'projectId' maps to 'parentTaskId' for tasks.
+                    // Let's use the one that matches logic.
+                    // If logic says "parentTaskId = proj.value", then compare against original.parentTaskId || original.projectId
+                    var oldParent = original.parentTaskId || original.projectId; // Compat
+                    if (isChanged(proj.value, oldParent)) {
+                        u.parentTaskId = proj.value;
+                        hasUpdates = true;
+                    }
+                }
 
                 // Context
                 var ctx = el.querySelector('.fix-context');
-                if (ctx && ctx.value) { u.contextId = ctx.value; hasUpdates = true; }
+                if (ctx && isChanged(ctx.value, original.contextId)) { u.contextId = ctx.value; hasUpdates = true; }
 
                 // Status
                 var stat = el.querySelector('.fix-status');
-                if (stat && stat.value && stat.value !== 'inbox') {
+                if (stat && stat.value && stat.value !== 'inbox' && isChanged(stat.value, original.status)) {
                     u.status = stat.value;
                     hasUpdates = true;
                 }
 
                 // Due Date
                 var due = el.querySelector('.fix-due');
-                if (due && due.value) { u.dueDate = due.value; hasUpdates = true; }
+                if (due && isChanged(due.value, original.dueDate)) { u.dueDate = due.value; hasUpdates = true; }
 
                 // Scheduled Date
                 var sched = el.querySelector('.fix-scheduled');
-                if (sched && sched.value) { u.scheduledDate = sched.value; hasUpdates = true; }
+                if (sched && isChanged(sched.value, original.scheduledDate)) { u.scheduledDate = sched.value; hasUpdates = true; }
 
                 // Time
                 var time = el.querySelector('.fix-time');
-                if (time && time.value) { u.timeEstimate = time.value; hasUpdates = true; }
+                if (time && isChanged(time.value, original.timeEstimate)) { u.timeEstimate = time.value; hasUpdates = true; }
 
                 // Energy
                 var energy = el.querySelector('.fix-energy');
-                if (energy && energy.value && energy.value !== 'medium') { u.energyRequired = energy.value; hasUpdates = true; }
+                if (energy && isChanged(energy.value, original.energyRequired)) { u.energyRequired = energy.value; hasUpdates = true; }
 
                 // Importance
                 var imp = el.querySelector('.fix-importance');
-                if (imp && imp.value) { u.importance = imp.value; hasUpdates = true; }
+                // original.importance might be number or string. Compare loosely.
+                if (imp && imp.value != (original.importance || '')) { u.importance = imp.value; hasUpdates = true; }
 
                 // Urgency
                 var urg = el.querySelector('.fix-urgency');
-                if (urg && urg.value) { u.urgency = urg.value; hasUpdates = true; }
+                if (urg && urg.value != (original.urgency || '')) { u.urgency = urg.value; hasUpdates = true; }
 
                 // Star
                 var star = el.querySelector('.fix-star');
                 if (star) {
                     var isStarred = (star.dataset.starred === 'true');
-                    // Only update if strictly changed from original? 
-                    // Complexity: 'original' is not easily accessible here without lookup.
-                    // But we can check if it differs from default? No, just send it if true, or if likely changed.
-                    // Simplest: Send if present. Backend handles merging.
-                    u.isStarred = isStarred;
-                    hasUpdates = true;
+                    // Original might be boolean or 'true'/'false' string? safely cast
+                    var originalStarred = (original.isStarred === true || original.isStarred === 'true');
+                    if (isStarred !== originalStarred) {
+                        u.isStarred = isStarred;
+                        hasUpdates = true;
+                    }
                 }
 
                 if (hasUpdates) {
