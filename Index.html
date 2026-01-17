@@ -3379,6 +3379,28 @@
             // Given the complexity/rarity, we'll stick to the generic error toast for now. If it fails, a subsequent reloadAllData() (triggered manually or auto) fixes it.
         }
 
+        function completeProjectClick(id) {
+            // Safety Check
+            if (hasActiveChildrenLocal(id)) {
+                alert('Cannot complete this project because it has active sub-items. Please resolve them first.');
+                return;
+            }
+
+            // Optimistic update
+            var p = state.projects.find(function (x) { return x.id === id; });
+            if (p) {
+                p.status = 'completed';
+                // Remove from view immediately
+                renderPage(state.currentPage);
+                // Badge updates? Projects don't usually affect inbox/next badges unless they were part of counts
+                // But review badge might change
+                updateReviewBadge();
+            }
+
+            // Queue Request
+            requestQueue.enqueue('completeProject', { id: id }, null, 'Complete Project');
+        }
+
 
         function updateCurrentContext() { google.script.run.updateSetting('currentContext', document.getElementById('currentContext').value); }
         function updateCurrentEnergy() { google.script.run.updateSetting('currentEnergyLevel', document.getElementById('currentEnergy').value); }
