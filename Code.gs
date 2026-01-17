@@ -27,6 +27,12 @@ function doGet(e) {
     return HtmlService.createHtmlOutputFromFile('DebugPage')
       .setTitle('GTD Debug')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (params.page === 'import' && activeUser === Session.getEffectiveUser().getEmail()) {
+     // Owner -> Import Tool
+     return HtmlService.createHtmlOutputFromFile('Import')
+      .setTitle('GTD Import & Scan')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   } else if (activeUser === Session.getEffectiveUser().getEmail() && params.page !== 'capture') {
      // Owner -> Full App
      return HtmlService.createHtmlOutputFromFile('Index')
@@ -760,6 +766,13 @@ function convertTaskToProjectWrapper(id) {
     status: 'active'
   });
   return result;
+}
+
+/**
+ * Helper to get the script URL for frontend navigation
+ */
+function getScriptUrl() {
+  return ScriptApp.getService().getUrl();
 }
 
 /**

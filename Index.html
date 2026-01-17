@@ -1008,6 +1008,9 @@
                         <span class="material-icons">inbox</span><span>Inbox</span><span class="badge"
                             id="inboxBadge"></span>
                     </a>
+                    <a href="#" onclick="openImportWindow(); return false;" class="nav-item">
+                        <span class="material-icons">move_to_inbox</span><span>Import & Scan</span>
+                    </a>
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title">Do</div>
@@ -1277,6 +1280,11 @@
                     pa.innerHTML += '<option value="' + a.id + '">' + a.icon + ' ' + a.name + '</option>';
                 });
             }
+        }
+        function openImportWindow() {
+            google.script.run.withSuccessHandler(function (url) {
+                window.open(url + '?page=import', '_blank');
+            }).getScriptUrl();
         }
         function navigateTo(p) {
             state.currentPage = p;
@@ -1758,11 +1766,6 @@
         function renderInbox() {
             var t = getInboxTasks();
             var h = '<div class="page-header"><h2>Inbox</h2><p>Capture everything, process later</p></div>';
-            // Add Import Button
-            h += '<div style="margin-bottom: 16px;">' +
-                '<button class="btn btn-secondary" onclick="importGmail()" style="margin-right: 8px;"><span class="material-icons">download</span> Import (GTD/ToProcess)</button>' +
-                '<button class="btn btn-secondary" onclick="scanInbox()" style="margin-right: 8px;"><span class="material-icons">psychology</span> Scan Inbox (AI)</button>' +
-                '</div>';
 
             if (t.length === 0) {
                 h += '<div class="empty-state"><span class="material-icons">inbox</span><h3>Inbox Zero!</h3><p>Everything processed.</p></div>';
@@ -3008,54 +3011,8 @@
             }).compactDatabase();
         }
 
-        function importGmail() {
-            showLoading(true);
-            google.script.run.withSuccessHandler(function (r) {
-                showLoading(false);
-                if (r.success) {
-                    showToast('Imported ' + r.count + ' tasks');
-                    loadAllData();
-                } else {
-                    showToast('Error: ' + r.error);
-                }
-            }).withFailureHandler(function (e) { showToast('Error: ' + e); showLoading(false); }).importGmailTasks();
-        }
 
-        function scanInbox() {
-            var totalProcessed = 0;
-            var isScanning = true;
 
-            function runBatch() {
-                if (!isScanning) return;
-                showLoading(true);
-                showToast('Scanning... (Processed: ' + totalProcessed + ')');
-
-                google.script.run.withSuccessHandler(function (r) {
-                    totalProcessed += r.count;
-
-                    if (r.complete) {
-                        showLoading(false);
-                        showToast('Scan Complete. Total Processed: ' + totalProcessed);
-                        isScanning = false;
-                    } else if (r.count === 0 && r.threadsFound > 0) {
-                        // Stagnation detection: Found threads but couldn't process any
-                        showLoading(false);
-                        var errorMsg = r.error ? ': ' + r.error : '.';
-                        showToast('Scan Aborted. Error' + errorMsg);
-                        isScanning = false;
-                    } else {
-                        // Continue scanning
-                        runBatch();
-                    }
-                }).withFailureHandler(function (e) {
-                    showToast('Error: ' + e);
-                    showLoading(false);
-                    isScanning = false;
-                }).scanInboxForSuggestions();
-            }
-
-            runBatch();
-        }
 
         function saveAttentionFixes() {
             var items = document.querySelectorAll('#attentionFixList .fix-item');
