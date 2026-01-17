@@ -3659,7 +3659,8 @@
 
                             // 2. Update Local State (Tasks Array)
                             let collection = (req.type === 'createProject') ? state.projects : state.tasks;
-                            const localIdx = collection.findIndex(t => t.id === req.tempId);
+                            // FIX: Check by ID OR by Reference (in case ID was mutated or mismatched)
+                            const localIdx = collection.findIndex(t => t.id === req.tempId || (req.data && t === req.data));
 
                             if (localIdx !== -1) {
                                 collection[localIdx] = realObj;
