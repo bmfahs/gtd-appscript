@@ -716,6 +716,31 @@ function createTaskWrapper(taskData) {
 }
 
 /**
+ * Wrapper for Batch Creation
+ */
+function createTaskBatchWrapper(tasks) {
+  if (!tasks || !tasks.length) return { success: true, count: 0 };
+  
+  var count = 0;
+  for (var i = 0; i < tasks.length; i++) {
+    try {
+      TaskService.createTask({
+        title: tasks[i].title,
+        notes: tasks[i].notes,
+        status: 'inbox',
+        type: 'task',
+        importance: tasks[i].importance || '',
+        urgency: tasks[i].urgency || ''
+      });
+      count++;
+    } catch (e) {
+      console.error('Batch Create Error at index ' + i + ': ' + e);
+    }
+  }
+  return { success: true, count: count };
+}
+
+/**
  * Setup/View API Secret for Quick Capture
  * Run this function manually to see your API Key
  */

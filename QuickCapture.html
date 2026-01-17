@@ -11,6 +11,8 @@
             --bg: #f3f4f6;
             --card: #ffffff;
             --text: #1f2937;
+            --danger: #ef4444;
+            --secondary: #6b7280;
         }
 
         body {
@@ -19,10 +21,15 @@
             color: var(--text);
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
             min-height: 100vh;
             margin: 0;
             padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
         }
 
         .card {
@@ -30,8 +37,6 @@
             padding: 2rem;
             border-radius: 12px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 400px;
         }
 
         h1 {
@@ -64,13 +69,17 @@
 
         textarea {
             resize: vertical;
-            min-height: 100px;
+            min-height: 80px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 1.5rem;
         }
 
         button {
             width: 100%;
-            background-color: var(--primary);
-            color: white;
             padding: 0.75rem;
             border: none;
             border-radius: 6px;
@@ -84,6 +93,79 @@
             opacity: 0.8;
         }
 
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: #e5e7eb;
+            color: var(--text);
+        }
+
+        .btn-success {
+            background-color: #059669;
+            color: white;
+        }
+
+        .queue-list {
+            margin-top: 2rem;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 1rem;
+        }
+
+        .queue-header {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--secondary);
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .queue-item {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .queue-item:hover {
+            border-color: var(--primary);
+        }
+
+        .queue-content {
+            flex: 1;
+        }
+
+        .queue-title {
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        .queue-notes {
+            font-size: 0.8rem;
+            color: var(--secondary);
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .queue-remove {
+            color: var(--danger);
+            font-size: 1.2rem;
+            margin-left: 10px;
+            cursor: pointer;
+            padding: 0 4px;
+        }
+
         .status {
             margin-top: 1rem;
             text-align: center;
@@ -93,71 +175,211 @@
         }
 
         .error {
-            color: #dc2626;
+            color: var(--danger);
+        }
+
+        /* Sticky Helper */
+        .sticky-footer {
+            position: sticky;
+            bottom: 0;
+            background: var(--card);
+            padding-top: 10px;
+            margin-top: 10px;
+            border-top: 1px solid transparent;
         }
     </style>
 </head>
 
 <body>
-    <div class="card">
-        <h1>Quick Capture</h1>
+    <div class="container">
+        <div class="card">
+            <h1>Quick Capture</h1>
 
-        <div class="form-group">
-            <label for="title">Task Title</label>
-            <input type="text" id="title" placeholder="Buy milk..." required autofocus autocomplete="off">
+            <div class="form-group">
+                <label for="title">Task Title</label>
+                <input type="text" id="title" placeholder="Buy milk..." required autofocus autocomplete="off"
+                    onkeydown="handleKey(event)">
+            </div>
+
+            <div class="form-group">
+                <label for="notes">Notes (Optional)</label>
+                <textarea id="notes" placeholder="Details..." onkeydown="handleKey(event)"></textarea>
+            </div>
+
+            <div class="btn-group">
+                <button id="addBtn" class="btn-secondary" onclick="addToQueue()">Add to Queue</button>
+            </div>
+
+            <div id="queueSection" style="display:none;">
+                <div class="queue-list">
+                    <div class="queue-header">
+                        <span>Pending Items (<span id="queueCount">0</span>)</span>
+                        <span style="font-size:0.8rem; cursor:pointer; color:var(--danger);"
+                            onclick="clearQueue()">Clear All</span>
+                    </div>
+                    <div id="queueItems"></div>
+                </div>
+
+                <div class="sticky-footer">
+                    <button id="submitBtn" class="btn-primary" onclick="submitBatch()">Submit Batch</button>
+                </div>
+            </div>
+
+            <div id="status" class="status"></div>
         </div>
-
-        <div class="form-group">
-            <label for="notes">Notes (Optional)</label>
-            <textarea id="notes" placeholder="Details..."></textarea>
-        </div>
-
-        <button id="submitBtn" onclick="submitTask()">Add to Inbox</button>
-        <div id="status" class="status"></div>
     </div>
 
     <script>
-        function submitTask() {
-            const title = document.getElementById('title').value;
-            const notes = document.getElementById('notes').value;
-            const btn = document.getElementById('submitBtn');
-            const status = document.getElementById('status');
+        var queue = [];
+        var editIndex = -1; // -1 means new item
 
-            if (!title.trim()) {
-                status.textContent = "Title is required";
-                status.className = "status error";
+        function handleKey(e) {
+            // Enter in Title -> Add to Queue (unless Shift pressed)
+            if (e.target.id === 'title' && e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                // If notes are empty, just add. If user wants notes, they should tab to notes.
+                // UX decision: Enter = Next Field or Submit?
+                // Let's make Enter in Title focus Notes? No, user wants "Quickly note multiple".
+                // Better: Enter adds to queue immediately if notes empty. If notes has focus, Shift+Enter adds to queue?
+                // Standard: Enter submits form.
+                addToQueue();
+            }
+        }
+
+        function addToQueue() {
+            var titleInput = document.getElementById('title');
+            var notesInput = document.getElementById('notes');
+            var title = titleInput.value.trim();
+            var notes = notesInput.value.trim();
+
+            if (!title) {
+                showStatus('Title is required', true);
                 return;
             }
 
-            btn.disabled = true;
-            btn.textContent = "Saving...";
-            status.textContent = "";
+            var item = { title: title, notes: notes };
 
-            // Determine if we mimic a webhook or use script.run
-            // We use script.run because it's simpler for a hosted page
+            if (editIndex > -1) {
+                // Update existing
+                queue[editIndex] = item;
+                editIndex = -1;
+                document.getElementById('addBtn').textContent = "Add to Queue";
+            } else {
+                // Add new
+                queue.push(item);
+            }
+
+            titleInput.value = '';
+            notesInput.value = '';
+            titleInput.focus();
+            showStatus(''); // Clear error if any
+            renderQueue();
+        }
+
+        function renderQueue() {
+            var list = document.getElementById('queueItems');
+            var section = document.getElementById('queueSection');
+            var countSpan = document.getElementById('queueCount');
+            var btn = document.getElementById('submitBtn');
+
+            list.innerHTML = '';
+
+            if (queue.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            countSpan.textContent = queue.length;
+            btn.textContent = 'Submit Batch (' + queue.length + ')';
+
+            queue.forEach(function (item, idx) {
+                var div = document.createElement('div');
+                div.className = 'queue-item';
+                div.onclick = function (e) { if (e.target.className !== 'queue-remove') editItem(idx); };
+
+                var content = '<div class="queue-content">';
+                content += '<div class="queue-title">' + escapeHtml(item.title) + '</div>';
+                if (item.notes) content += '<div class="queue-notes">' + escapeHtml(item.notes) + '</div>';
+                content += '</div>';
+
+                content += '<div class="queue-remove" onclick="removeItem(' + idx + ')">&times;</div>';
+
+                div.innerHTML = content;
+                list.appendChild(div);
+            });
+        }
+
+        function editItem(idx) {
+            // Load into form
+            var item = queue[idx];
+            document.getElementById('title').value = item.title;
+            document.getElementById('notes').value = item.notes;
+            editIndex = idx;
+
+            // Change button text to indicate "Update"
+            document.getElementById('addBtn').textContent = "Update Queue Item";
+            document.getElementById('title').focus();
+        }
+
+        function removeItem(idx) {
+            queue.splice(idx, 1);
+            if (editIndex === idx) {
+                // Cancel edit if deleted
+                editIndex = -1;
+                document.getElementById('addBtn').textContent = "Add to Queue";
+                document.getElementById('title').value = '';
+                document.getElementById('notes').value = '';
+            } else if (editIndex > idx) {
+                editIndex--;
+            }
+            renderQueue();
+        }
+
+        function clearQueue() {
+            if (confirm('Clear all pending items?')) {
+                queue = [];
+                editIndex = -1;
+                renderQueue();
+            }
+        }
+
+        function submitBatch() {
+            if (queue.length === 0) return;
+
+            var btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
             google.script.run
-                .withSuccessHandler(function () {
-                    document.getElementById('title').value = '';
-                    document.getElementById('notes').value = '';
-                    btn.textContent = "Add to Inbox";
+                .withSuccessHandler(function (r) {
+                    queue = [];
+                    renderQueue();
                     btn.disabled = false;
-                    status.textContent = "Saved to Inbox!";
-                    status.className = "status";
-                    setTimeout(() => status.textContent = "", 3000);
-                    document.getElementById('title').focus();
+                    showStatus('Batch Saved! (' + r.count + ' items)');
+                    setTimeout(function () { showStatus(''); }, 3000);
                 })
                 .withFailureHandler(function (e) {
-                    status.textContent = "Error: " + e;
-                    status.className = "status error";
-                    btn.textContent = "Add to Inbox";
+                    showStatus('Error: ' + e, true);
                     btn.disabled = false;
+                    renderQueue(); // Reset button text
                 })
-                .createTaskWrapper({
-                    title: title,
-                    notes: notes,
-                    status: 'inbox',
-                    type: 'task'
-                });
+                .createTaskBatchWrapper(queue);
+        }
+
+        function showStatus(msg, isError) {
+            var el = document.getElementById('status');
+            el.textContent = msg;
+            el.className = isError ? 'status error' : 'status';
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
         }
     </script>
 </body>
