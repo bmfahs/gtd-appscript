@@ -1982,12 +1982,12 @@
             if (matches.length === 0) {
                 h = '<div style="padding:8px; color:var(--text-muted); font-size:12px;">No projects found</div>';
             } else {
-                h += '<div class="dropdown-item" onclick="selectInlineProject(this, \'\', \'No Project\')" style="padding:6px 12px; cursor:pointer; font-size:12px;">No Project</div>';
+                h += '<div class="dropdown-item" onclick="event.stopPropagation(); selectInlineProject(this, \'\', \'No Project\')" style="padding:6px 12px; cursor:pointer; font-size:12px;">No Project</div>';
                 matches.forEach(function (m) {
                     var p = m.project;
                     var pad = m.level * 16;
 
-                    h += '<div class="dropdown-item" onclick="selectInlineProject(this, \'' + p.id + '\', \'' + esc(p.name).replace(/'/g, "\\'") + '\')" style="padding:6px 12px 6px ' + (12 + pad) + 'px; cursor:pointer; font-size:12px;">';
+                    h += '<div class="dropdown-item" onclick="event.stopPropagation(); selectInlineProject(this, \'' + p.id + '\', \'' + esc(p.name).replace(/'/g, "\\'") + '\')" style="padding:6px 12px 6px ' + (12 + pad) + 'px; cursor:pointer; font-size:12px;">';
                     if (p.type === 'folder') h += '<span class="material-icons" style="font-size:14px; vertical-align:middle; margin-right:4px;">folder</span>';
                     else h += '<span class="material-icons" style="font-size:14px; vertical-align:middle; margin-right:4px;">assignment</span>';
                     h += esc(p.name) + '</div>';
