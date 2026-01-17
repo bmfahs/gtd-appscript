@@ -1575,8 +1575,8 @@
 
             var h = '<div class="page-header"><h2>Search Results</h2><p>Matches for "' + esc(q) + '"</p></div>';
 
-            // Build full tree
-            var roots = buildUnifiedTree(state.tasks, state.projects);
+            // Build full tree (includeAll = true for search)
+            var roots = buildUnifiedTree(state.tasks, state.projects, true);
 
             // Filter tree
             var filteredRoots = filterTree(roots, q);
@@ -2086,27 +2086,38 @@
             return h;
         }
 
-        function buildUnifiedTree(tasks, projects) {
+        function buildUnifiedTree(tasks, projects, includeAll) {
             var map = {};
             var roots = [];
 
             // Initialize map with Projects
             projects.forEach(function (p) {
-                if (p.status !== 'active') return;
+                // Always exclude completed/dropped projects to avoid clutter in search
+                if (p.status === 'completed' || p.status === 'dropped') return;
+
+                // If not searching (includeAll=false), restrict to active projects only
+                if (!includeAll && p.status !== 'active') return;
+
                 map[p.id] = { data: p, type: p.type || 'project', children: [] };
             });
 
             // Initialize map with Tasks
             tasks.forEach(function (t) {
-                // Unified View: Exclude 'inbox', 'deleted', 'done'
-                if (t.status === 'deleted' || t.status === 'done' || t.status === 'inbox') return;
+                // Always exclude deleted and done items
+                if (t.status === 'deleted' || t.status === 'done') return;
+
+                // Unified View: Exclude 'inbox' unless searching
+                if (!includeAll && t.status === 'inbox') return;
+
                 map[t.id] = { data: t, type: 'task', children: [] };
             });
 
             // Build hierarchy
             // 1. Link Projects to Parent Projects
             projects.forEach(function (p) {
-                if (p.status !== 'active') return;
+                if (p.status === 'completed' || p.status === 'dropped') return;
+                if (!includeAll && p.status !== 'active') return;
+
                 var node = map[p.id];
                 if (p.parentProjectId && map[p.parentProjectId]) {
                     map[p.parentProjectId].children.push(node);
@@ -2117,7 +2128,9 @@
 
             // 2. Link Tasks to Parents (Task or Project)
             tasks.forEach(function (t) {
-                if (t.status === 'deleted' || t.status === 'done' || t.status === 'inbox') return;
+                if (t.status === 'deleted' || t.status === 'done') return;
+                if (!includeAll && t.status === 'inbox') return;
+
                 var node = map[t.id];
 
                 // Priority: Parent Task > Project
