@@ -1765,7 +1765,10 @@
 
         function renderInbox() {
             var t = getInboxTasks();
-            var h = '<div class="page-header"><h2>Inbox</h2><p>Capture everything, process later</p></div>';
+            var h = '<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">';
+            h += '<div><h2>Inbox</h2><p>Capture everything, process later</p></div>';
+            h += '<button class="btn-icon" onclick="loadAllData()" title="Refresh Inbox" style="background:var(--bg-tertiary); padding:8px; border-radius:50%;"><span class="material-icons">refresh</span></button>';
+            h += '</div>';
 
             if (t.length === 0) {
                 h += '<div class="empty-state"><span class="material-icons">inbox</span><h3>Inbox Zero!</h3><p>Everything processed.</p></div>';
