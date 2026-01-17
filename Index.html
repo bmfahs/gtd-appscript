@@ -1142,6 +1142,7 @@
                             <div class="form-group">
                                 <label for="itemImportance">Importance</label>
                                 <select id="itemImportance" class="form-control">
+                                    <option value="">Select...</option>
                                     <option value="1">Low</option>
                                     <option value="2">Normal</option>
                                     <option value="3">High</option>
@@ -1151,6 +1152,7 @@
                             <div class="form-group">
                                 <label for="itemUrgency">Urgency</label>
                                 <select id="itemUrgency" class="form-control">
+                                    <option value="">Select...</option>
                                     <option value="1">Low</option>
                                     <option value="2">Normal</option>
                                     <option value="3">High</option>
@@ -2648,10 +2650,10 @@
                 document.getElementById('itemContext').value = state.settings.defaultContext || '';
                 document.getElementById('itemEnergy').value = 'medium';
                 document.getElementById('itemTimeEstimate').value = '';
-                document.getElementById('itemTimeEstimate').value = '';
+
                 document.getElementById('itemWaitingFor').value = '';
-                document.getElementById('itemImportance').value = '2';
-                document.getElementById('itemUrgency').value = '2';
+                document.getElementById('itemImportance').value = '';
+                document.getElementById('itemUrgency').value = '';
 
                 // Reset Star
                 var starBtn = document.getElementById('itemStarBtn');
@@ -2734,6 +2736,18 @@
                 dueDate: document.getElementById('itemDueDate').value,
                 reviewCadence: document.getElementById('itemCadence').value
             };
+
+            // Safety Check for Status Change
+            if (id && hasActiveChildrenLocal(id)) {
+                var newStatus = d.status;
+                // If attempting to complete, drop, or delete (though delete is separate fn)
+                if (newStatus === 'done' || newStatus === 'completed' || newStatus === 'dropped') {
+                    // Check if status actually changed (don't block edits if already in that state/legacy? strictly speaking if it has active children it shouldn't be in that state anyway).
+                    // But simpler: if trying to set to these states, BLOCK.
+                    alert('Cannot complete/drop this item because it has active children. Please resolve them first.');
+                    return;
+                }
+            }
 
             // Parent ID
             // Unified parent field - maps to different DB fields based on type, OR we can normalize in backend?
@@ -2829,9 +2843,40 @@
             state.currentItem = null;
         }
 
+        // Helper to check for active children
+        function hasActiveChildrenLocal(id) {
+            // Check both tasks and projects arrays for children
+            // Tasks: parentTaskId === id
+            // Projects: parentProjectId === id (which is stored as parentTaskId in DB, but frontend maps it to parentProjectId or parentTaskId depending on where we look)
+            // Let's check both to be safe, or check raw if possible.
+            // Frontend: Tasks have parentTaskId. Projects have parentProjectId.
+
+            var activeTaskChildren = state.tasks.filter(t =>
+                t.parentTaskId === id &&
+                t.status !== 'done' &&
+                t.status !== 'deleted' &&
+                t.status !== 'dropped'
+            );
+
+            var activeProjectChildren = state.projects.filter(p =>
+                p.parentProjectId === id &&
+                p.status !== 'completed' &&
+                p.status !== 'dropped'
+            );
+
+            return (activeTaskChildren.length > 0 || activeProjectChildren.length > 0);
+        }
+
         function deleteCurrentItem() {
-            if (!state.currentItem || !confirm('Delete this item?')) return;
+            if (!state.currentItem) return;
             var id = state.currentItem.id;
+
+            if (hasActiveChildrenLocal(id)) {
+                alert('Cannot delete this item because it has active active children (tasks or subprojects). Please delete or move them first.');
+                return;
+            }
+
+            if (!confirm('Delete this item?')) return;
             var type = document.getElementById('itemType').value;
             var title = state.currentItem.title || state.currentItem.name;
 
@@ -3310,6 +3355,12 @@
         }
 
         function completeTaskClick(id) {
+            // Safety Check
+            if (hasActiveChildrenLocal(id)) {
+                alert('Cannot complete this task because it has active sub-tasks. Please resolve them first.');
+                return;
+            }
+
             // Optimistic update
             var t = state.tasks.find(function (x) { return x.id === id; });
             if (t) {

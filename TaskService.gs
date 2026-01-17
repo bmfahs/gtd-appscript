@@ -140,6 +140,17 @@ const TaskService = {
    * Update an existing task
    */
   updateTask: function(taskId, updates) {
+    // Safety Check: If completing or dropping, check for active children
+    if (updates.status && (
+        updates.status === STATUS.DONE || 
+        updates.status === STATUS.DELETED || 
+        updates.status === 'dropped'
+    )) {
+        if (this.hasActiveChildren(taskId)) {
+            return { success: false, error: 'Cannot complete/delete item with active children' };
+        }
+    }
+
     // Need to handle variable column length if schema updated but data not migrated fully?
     // Assuming Config.gs TASK_COLS matches the sheet columns after updateSchema is run.
     const sheet = getSheet(SHEETS.TASKS);
@@ -193,11 +204,28 @@ const TaskService = {
     
     return { success: true, task: task };
   },
+
+  /**
+   * Check if item has active children
+   */
+  hasActiveChildren: function(parentId) {
+    const children = this.getAllItems().filter(t => t.parentTaskId === parentId);
+    // Active children are those NOT done AND NOT deleted AND NOT dropped
+    const activeChildren = children.filter(t => 
+        t.status !== STATUS.DONE && 
+        t.status !== STATUS.DELETED && 
+        t.status !== 'dropped'
+    );
+    return activeChildren.length > 0;
+  },
   
   /**
    * Delete a task (soft delete)
    */
   deleteTask: function(taskId) {
+    if (this.hasActiveChildren(taskId)) {
+        return { success: false, error: 'Cannot delete item with active children' };
+    }
     return this.updateTask(taskId, { status: STATUS.DELETED });
   },
   
