@@ -174,6 +174,12 @@ const TaskService = {
     if (updates.projectId !== undefined && updates.parentTaskId === undefined) {
       updates.parentTaskId = updates.projectId;
     }
+    // Phase 1 Fix: Ensure legacy 'projectId' property on the object matches 'parentTaskId'
+    // This ensures frontend views that rely on .projectId see the change immediately
+    if (updates.parentTaskId !== undefined) {
+        // We modify the update object (or the task object later) to ensure sync
+        updates.projectId = updates.parentTaskId;
+    }
 
     Object.assign(task, updates);
     task.modifiedDate = now();
