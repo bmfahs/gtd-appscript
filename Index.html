@@ -3651,16 +3651,45 @@
                         }
 
                         // FIX: Also update local state for Update operations!
-                        // If we edited coordinates/notes, we want local state to match server state immediately
                         if ((req.type === 'updateTask' || req.type === 'updateProject') && realObj && realObj.id) {
-                            let collection = (req.type === 'updateProject') ? state.projects : state.tasks;
-                            const localIdx = collection.findIndex(t => t.id === realObj.id);
-                            if (localIdx !== -1) {
-                                collection[localIdx] = realObj;
-                                // Update currentItem if it's the one open
-                                if (state.currentItem && state.currentItem.id === realObj.id) {
-                                    state.currentItem = realObj;
+                            // Determine primary and secondary collections based on REQUEST type
+                            // If req is updateProject, we expect it to be in projects. If not, check tasks.
+                            let primaryCollection = (req.type === 'updateProject') ? state.projects : state.tasks;
+                            let secondaryCollection = (req.type === 'updateProject') ? state.tasks : state.projects;
+
+                            let primaryIdx = primaryCollection.findIndex(t => t.id === realObj.id);
+
+                            if (primaryIdx !== -1) {
+                                // Found in expected collection.
+                                // BUT verify if type changed unexpectedly?
+                                // If req.type matches object type, good.
+                                // If mismatch, handle it? (Rare/Edge case)
+                                // Let's just update perfectly.
+                                primaryCollection[primaryIdx] = realObj;
+                            } else {
+                                // NOT found in expected collection.
+                                // Check if it exists in the other collection (Migration case)
+                                let secondaryIdx = secondaryCollection.findIndex(t => t.id === realObj.id);
+
+                                if (secondaryIdx !== -1) {
+                                    console.log('Migration detected: Item moving collections');
+                                    // Remove from old
+                                    secondaryCollection.splice(secondaryIdx, 1);
+                                    // Add to new
+                                    primaryCollection.push(realObj);
+                                } else {
+                                    // Not found in either? Sync issue or new?
+                                    // Maybe just add it to primary?
+                                    // For update, usually means we missed the specific item or data is stale.
+                                    // Let's safe-add to primary.
+                                    console.log('Update item not found locally, adding to collection:', req.type);
+                                    primaryCollection.push(realObj);
                                 }
+                            }
+
+                            // Update currentItem reference
+                            if (state.currentItem && state.currentItem.id === realObj.id) {
+                                state.currentItem = realObj;
                             }
                         }
 
