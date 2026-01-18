@@ -27,7 +27,9 @@ const GmailService = {
         notes: this.formatEmailNotes(from, date, body),
         status: STATUS.INBOX,
         emailId: messageId,
-        emailThreadId: thread.getId()
+        emailThreadId: thread.getId(),
+        importance: '',
+        urgency: ''
       });
       
       // Add a label to the email to mark it as captured
@@ -132,7 +134,9 @@ ${truncatedBody}${body && body.length > 500 ? '...' : ''}`;
         status: STATUS.INBOX,
         emailId: message.getId(),
         emailThreadId: thread.getId(),
-        parentTaskId: parentTaskId
+        parentTaskId: parentTaskId,
+        importance: '',
+        urgency: ''
       });
       
       count++;
@@ -419,7 +423,9 @@ function createTaskFromCurrentEmail(e) {
            (notes ? '\n\nAdditional notes: ' + notes : ''),
     status: STATUS.INBOX,
     emailId: messageId,
-    emailThreadId: thread.getId()
+    emailThreadId: thread.getId(),
+    importance: '',
+    urgency: ''
   });
   
   // Label the email
