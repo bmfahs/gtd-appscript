@@ -2078,7 +2078,7 @@
         }
 
         function renderAllTasks() {
-            var tree = buildUnifiedTree(state.tasks, state.projects);
+            var tree = buildUnifiedTree(state.tasks, state.projects, { includeInactiveProjects: true, includeInbox: false });
             var h = '<div class="page-header"><h2>All Tasks</h2><p>Unified Hierarchical View</p></div>';
             h += '<div class="task-list">';
             h += renderUnifiedTree(tree, 0);
@@ -2086,17 +2086,30 @@
             return h;
         }
 
-        function buildUnifiedTree(tasks, projects, includeAll) {
+        function buildUnifiedTree(tasks, projects, options) {
+            // Options: { includeInactiveProjects: bool, includeInbox: bool }
+            // Legacy support: if options is boolean true, it means search behavior (include all)
+            var includeInactiveProjects = false;
+            var includeInbox = false;
+
+            if (options === true) {
+                includeInactiveProjects = true;
+                includeInbox = true;
+            } else if (typeof options === 'object') {
+                includeInactiveProjects = !!options.includeInactiveProjects;
+                includeInbox = !!options.includeInbox;
+            }
+
             var map = {};
             var roots = [];
 
             // Initialize map with Projects
             projects.forEach(function (p) {
-                // Always exclude completed/dropped projects to avoid clutter in search
+                // Always exclude completed/dropped projects to avoid clutter
                 if (p.status === 'completed' || p.status === 'dropped') return;
 
-                // If not searching (includeAll=false), restrict to active projects only
-                if (!includeAll && p.status !== 'active') return;
+                // If not including inactive, restrict to active projects only
+                if (!includeInactiveProjects && p.status !== 'active') return;
 
                 map[p.id] = { data: p, type: p.type || 'project', children: [] };
             });
@@ -2106,8 +2119,8 @@
                 // Always exclude deleted and done items
                 if (t.status === 'deleted' || t.status === 'done') return;
 
-                // Unified View: Exclude 'inbox' unless searching
-                if (!includeAll && t.status === 'inbox') return;
+                // Unified View: Exclude 'inbox' unless requested
+                if (!includeInbox && t.status === 'inbox') return;
 
                 map[t.id] = { data: t, type: 'task', children: [] };
             });
@@ -2116,7 +2129,7 @@
             // 1. Link Projects to Parent Projects
             projects.forEach(function (p) {
                 if (p.status === 'completed' || p.status === 'dropped') return;
-                if (!includeAll && p.status !== 'active') return;
+                if (!includeInactiveProjects && p.status !== 'active') return;
 
                 var node = map[p.id];
                 if (p.parentProjectId && map[p.parentProjectId]) {
@@ -2129,7 +2142,7 @@
             // 2. Link Tasks to Parents (Task or Project)
             tasks.forEach(function (t) {
                 if (t.status === 'deleted' || t.status === 'done') return;
-                if (!includeAll && t.status === 'inbox') return;
+                if (!includeInbox && t.status === 'inbox') return;
 
                 var node = map[t.id];
 
@@ -2198,6 +2211,8 @@
                     h += toggleHtml;
                     h += '<div class="task-checkbox" onclick="event.stopPropagation();completeProjectClick(\'' + p.id + '\')"></div>';
                     h += '<div style="flex: 1; font-weight: 600; font-size: 14px; color: var(--text-primary); display: flex; align-items: center;"><span class="material-icons" style="font-size: 18px; margin-right: 6px; color: var(--text-muted);">' + icon + '</span>' + esc(p.name) + '</div>';
+                    // Add Task Button (All Tasks View)
+                    h += '<button class="btn-icon" onclick="event.stopPropagation(); openItemDialog(null, \'task\', \'' + p.id + '\')" title="Add Task to Project" style="color:var(--text-muted); padding:4px; margin-left:8px;"><span class="material-icons" style="font-size:18px;">add</span></button>';
                     h += '</div>';
                 } else {
                     // Render Task
