@@ -2116,8 +2116,8 @@
 
             // Initialize map with Tasks
             tasks.forEach(function (t) {
-                // Always exclude deleted and done items
-                if (t.status === 'deleted' || t.status === 'done') return;
+                // Always exclude deleted, done, and dropped items
+                if (t.status === 'deleted' || t.status === 'done' || t.status === 'dropped') return;
 
                 // Unified View: Exclude 'inbox' unless requested
                 if (!includeInbox && t.status === 'inbox') return;
@@ -2141,7 +2141,7 @@
 
             // 2. Link Tasks to Parents (Task or Project)
             tasks.forEach(function (t) {
-                if (t.status === 'deleted' || t.status === 'done') return;
+                if (t.status === 'deleted' || t.status === 'done' || t.status === 'dropped') return;
                 if (!includeInbox && t.status === 'inbox') return;
 
                 var node = map[t.id];
@@ -2193,6 +2193,11 @@
                 // Reduced left margin since we adding a toggle/spacer which takes up space? 
                 // No, keep indentation logic but maybe adjust padding.
                 var commonStyle = 'margin-left: ' + padding + 'px; margin-bottom: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px;';
+
+                // Visual distinction for Someday status
+                if (node.data.status === 'someday') {
+                    commonStyle += ' opacity: 0.6; font-style: italic;';
+                }
 
                 // Toggle Icon
                 var toggleHtml = '';
