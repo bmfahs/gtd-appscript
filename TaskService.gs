@@ -407,9 +407,14 @@ const TaskService = {
       return { id: '', title: '', status: STATUS.INBOX };
     }
     
+    let rawTitle = row[TASK_COLS.TITLE] || '';
+    if (typeof rawTitle === 'string' && rawTitle.startsWith("'")) {
+       rawTitle = rawTitle.slice(1);
+    }
+    
     return {
       id: row[TASK_COLS.ID] || '',
-      title: row[TASK_COLS.TITLE] || '',
+      title: rawTitle,
       notes: row[TASK_COLS.NOTES] || '',
       status: row[TASK_COLS.STATUS] || STATUS.INBOX,
       // Phase 1: Map projectId property to PARENT_TASK_ID column
@@ -448,7 +453,17 @@ const TaskService = {
     const row = new Array(maxColIndex + 1).fill('');
     
     row[TASK_COLS.ID] = task.id;
-    row[TASK_COLS.TITLE] = task.title;
+    
+    // Prefix title with apostrophe if it starts with a number or looks like a date/month
+    // to prevent Google Sheets from auto-formatting it into a Date object
+    let safeTitle = task.title || '';
+    if (typeof safeTitle === 'string' && safeTitle.trim() !== '') {
+       // Just prefix all titles with an apostrophe. Google Sheets hides the apostrophe
+       // but treats the cell strictly as plain text. This is standard Sheets behavior.
+       safeTitle = "'" + safeTitle;
+    }
+    row[TASK_COLS.TITLE] = safeTitle;
+    
     row[TASK_COLS.NOTES] = task.notes;
     row[TASK_COLS.STATUS] = task.status;
     // Phase 1: Clear the projectId column (write empty string)
