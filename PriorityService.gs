@@ -30,9 +30,11 @@ const PriorityService = {
     // Default to Low/Normal if unset to avoid zero-multiplication issues
     // Importance: 1 (Min) to 5 (Max)
     let imp = task.importance ? parseInt(task.importance) : 2; 
+    if (isNaN(imp)) imp = 2;
     
     // Urgency: 1 (Min) to 5 (Max)
     let urg = task.urgency ? parseInt(task.urgency) : 2;
+    if (isNaN(urg)) urg = 2;
 
     // 3. DUE DATE MODIFIER (Increases Urgency)
     // If due date is approaching, Urgency skyrockets
@@ -69,7 +71,9 @@ const PriorityService = {
         computedScore += this.calculateAgeScore(task.createdDate);
     }
     
-    return parseFloat(computedScore.toFixed(2));
+    let finalScore = parseFloat(computedScore.toFixed(2));
+    if (isNaN(finalScore)) return 0;
+    return finalScore;
   },
   
   /**
@@ -107,6 +111,8 @@ const PriorityService = {
   calculateAgeScore: function(createdDate) {
     if (!createdDate) return 0;
     const created = parseDate(createdDate);
+    if (!created || isNaN(created.getTime())) return 0;
+    
     const now = new Date();
     const daysOld = Math.floor((now - created) / (1000 * 60 * 60 * 24));
     

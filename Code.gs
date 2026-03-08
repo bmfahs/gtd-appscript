@@ -203,7 +203,8 @@ function getAllData() {
       settings: getSettings()
     };
     Logger.log('getAllData() optimized success. Tasks: ' + activeTasks.length + ', Projects: ' + projects.length);
-    return data;
+    // Sanitize data before sending to client (google.script.run silently fails on Dates/NaN)
+    return JSON.parse(JSON.stringify(data));
   } catch (e) {
     Logger.log('getAllData() error: ' + e.toString());
     Logger.log('Stack: ' + e.stack);
@@ -221,7 +222,7 @@ function getAllData() {
         settings: getSettings()
       };
       Logger.log('getAllData() success after init');
-      return data;
+      return JSON.parse(JSON.stringify(data));
     } catch (e2) {
       Logger.log('getAllData() fatal error: ' + e2.toString());
       throw e2;
@@ -238,7 +239,10 @@ function getSettings() {
   const settings = {};
   
   for (let i = 1; i < data.length; i++) {
-    settings[data[i][0]] = data[i][1];
+    let key = data[i][0];
+    let value = data[i][1];
+    
+    settings[key] = value;
   }
   
   return settings;
