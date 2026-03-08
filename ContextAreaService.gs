@@ -44,6 +44,7 @@ const ContextService = {
     const row = [context.id, context.name, context.icon, context.sortOrder];
     sheet.appendRow(row);
     
+    if (typeof clearDataCache === 'function') clearDataCache();
     return context;
   },
   
@@ -66,6 +67,7 @@ const ContextService = {
     const row = [context.id, context.name, context.icon, context.sortOrder];
     sheet.getRange(rowNum, 1, 1, 4).setValues([row]);
     
+    if (typeof clearDataCache === 'function') clearDataCache();
     return { success: true, context: context };
   },
   
@@ -81,6 +83,7 @@ const ContextService = {
     }
     
     sheet.deleteRow(rowNum);
+    if (typeof clearDataCache === 'function') clearDataCache();
     return { success: true };
   },
   
@@ -152,6 +155,7 @@ const AreaService = {
     const row = [area.id, area.name, area.icon, area.sortOrder];
     sheet.appendRow(row);
     
+    if (typeof clearDataCache === 'function') clearDataCache();
     return area;
   },
   
@@ -174,6 +178,7 @@ const AreaService = {
     const row = [area.id, area.name, area.icon, area.sortOrder];
     sheet.getRange(rowNum, 1, 1, 4).setValues([row]);
     
+    if (typeof clearDataCache === 'function') clearDataCache();
     return { success: true, area: area };
   },
   
@@ -189,6 +194,7 @@ const AreaService = {
     }
     
     sheet.deleteRow(rowNum);
+    if (typeof clearDataCache === 'function') clearDataCache();
     return { success: true };
   },
   

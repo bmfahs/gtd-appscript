@@ -133,6 +133,9 @@ const TaskService = {
     const row = this.taskToRow(task);
     sheet.appendRow(row);
     
+    // Clear cache
+    if (typeof clearDataCache === 'function') clearDataCache();
+    
     return task;
   },
   
@@ -204,9 +207,11 @@ const TaskService = {
         // Optionally update headers here if we knew them, but appendRow usually handles it for data
     }
 
-    // Write back. 
-    // MigrationService.updateSchema() should be run first preferably, but this handles lazy expansion.
+    // Writing MigrationService.updateSchema() should be run first preferably, but this handles lazy expansion.
     sheet.getRange(rowNum, 1, 1, row.length).setValues([row]);
+    
+    // Clear cache
+    if (typeof clearDataCache === 'function') clearDataCache();
     
     return { success: true, task: task };
   },
@@ -247,6 +252,10 @@ const TaskService = {
     }
     
     sheet.deleteRow(rowNum);
+    
+    // Clear cache
+    if (typeof clearDataCache === 'function') clearDataCache();
+    
     return { success: true };
   },
   
@@ -370,6 +379,9 @@ const TaskService = {
         sheet.getRange(i + 1, TASK_COLS.PRIORITY + 1).setValue(newPriority);
       }
     }
+    
+    // Clear cache
+    if (typeof clearDataCache === 'function') clearDataCache();
     
     return { success: true, message: 'Priorities recalculated' };
   },

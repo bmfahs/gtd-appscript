@@ -171,11 +171,31 @@ function initializeSystem() {
 // ============================================
 
 /**
+ * Clear the data cache (Call this on every write operation)
+ */
+function clearDataCache() {
+  try {
+    const cache = CacheService.getUserCache();
+    cache.remove('gtd_all_data');
+    Logger.log('Cache cleared');
+  } catch (e) {
+    Logger.log('Error clearing cache: ' + e.toString());
+  }
+}
+
+/**
  * Get all data for initial load
  */
 function getAllData() {
   Logger.log('getAllData() called');
   try {
+    const cache = CacheService.getUserCache();
+    const cached = cache.get('gtd_all_data');
+    if (cached) {
+      Logger.log('Serving data from cache');
+      return JSON.parse(cached);
+    }
+
     // Optimization: Read Tasks sheet once for both Tasks and Projects
     // And filter out 'done' items to reduce payload size
     const allItems = TaskService.getAllItems();
@@ -204,7 +224,22 @@ function getAllData() {
     };
     Logger.log('getAllData() optimized success. Tasks: ' + activeTasks.length + ', Projects: ' + projects.length);
     // Sanitize data before sending to client (google.script.run silently fails on Dates/NaN)
-    return JSON.parse(JSON.stringify(data));
+    const sanitized = JSON.parse(JSON.stringify(data));
+    
+    // Store in cache for 6 hours (21600 seconds), maximum size is 100KB per value.
+    try {
+        const jsonString = JSON.stringify(sanitized);
+        if (jsonString.length < 100000) {
+            cache.put('gtd_all_data', jsonString, 21600);
+            Logger.log('Saved to cache');
+        } else {
+            Logger.log('Payload too large for cache (' + jsonString.length + ' bytes)');
+        }
+    } catch (ce) {
+        Logger.log('Cache save error: ' + ce.toString());
+    }
+
+    return sanitized;
   } catch (e) {
     Logger.log('getAllData() error: ' + e.toString());
     Logger.log('Stack: ' + e.stack);
@@ -258,12 +293,14 @@ function updateSetting(key, value) {
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === key) {
       sheet.getRange(i + 1, 2).setValue(value);
+      if (typeof clearDataCache === 'function') clearDataCache();
       return { success: true };
     }
   }
   
   // Setting doesn't exist, add it
   sheet.appendRow([key, value]);
+  if (typeof clearDataCache === 'function') clearDataCache();
   return { success: true };
 }
 
