@@ -4,7 +4,37 @@
  */
 
 const AIAgentService = {
-  
+
+  /**
+   * Helper to evaluate and aggregate the full parental structural ruleset graph up to the root
+   */
+  getContextLineage: function(startItem, allItems) {
+    if (!startItem || !allItems || allItems.length === 0) return "(No project specific context defined)";
+    
+    const itemMap = {};
+    allItems.forEach(i => itemMap[i.id] = i);
+    
+    const lineage = [];
+    let currentId = startItem.id;
+    const visited = new Set();
+    
+    while (currentId && itemMap[currentId] && !visited.has(currentId)) {
+        visited.add(currentId);
+        const node = itemMap[currentId];
+        
+        let ctx = node.aiContext ? node.aiContext.trim() : "";
+        if (ctx) {
+            let label = node.type ? node.type.toUpperCase() : "CONTAINER";
+            lineage.push(`[${label}: ${node.title}]: ${ctx}`);
+        }
+        
+        currentId = node.parentTaskId; // Navigate Upwards
+    }
+    
+    if (lineage.length === 0) return "(No parent context defined)";
+    return lineage.reverse().join("\\n      ");
+  },
+
   /**
    * Generate insights for a specific project
    */
@@ -17,7 +47,8 @@ const AIAgentService = {
     const globalContext = settings['GLOBAL_AI_CONTEXT'] || '';
     
     // Project context
-    const projectContext = project.aiContext || '';
+    const allItems = TaskService.getAllItems();
+    const projectContext = this.getContextLineage(project, allItems);
     
     if (!globalContext && !projectContext) {
       return { success: false, error: 'No AI Context found. Please add Global or Project AI Context to use insights.' };
@@ -120,6 +151,100 @@ const AIAgentService = {
   },
   
   /**
+   * Suggest Attention view fixes (Stalled Projects + Task Hygiene)
+   */
+  suggestAttentionFixes: function(payload) {
+    if (!payload || (!payload.stalledProjectIds.length && !payload.malformedTaskIds.length)) {
+      return { success: false, error: 'No items provided' };
+    }
+    
+    const stalledProjects = (payload.stalledProjectIds || []).map(id => ProjectService.getProject(id)).filter(p => p);
+    const malformedTasks = (payload.malformedTaskIds || []).map(id => TaskService.getTask(id)).filter(t => t);
+    
+    const settings = getSettings();
+    const globalContext = settings['GLOBAL_AI_CONTEXT'] || '';
+    
+    const contexts = ContextService.getAllContexts();
+    const contextSnippets = contexts.map(c => `ID: ${c.id} | Name: ${c.name}`).join('\\n');
+    
+    const allItems = TaskService.getAllItems();
+    
+    const stalledProjectSnippets = stalledProjects.map(p => {
+        const lineage = this.getContextLineage(p, allItems);
+        return `ID: ${p.id} | Name: "${p.name}" | Inherited Rules:\n      ${lineage}`;
+    }).join('\\n\\n');
+    
+    const malformedTaskSnippets = malformedTasks.map(t => {
+      let snippet = `ID: ${t.id} | Title: "${t.title}" | Notes: "${t.notes}"`;
+      if (t.parentTaskId) {
+        const parent = ProjectService.getProject(t.parentTaskId); 
+        if (parent) {
+           const lineage = this.getContextLineage(parent, allItems);
+           if (lineage !== "(No parent context defined)") {
+               snippet += `\\n        Parent Heirarchy Rules:\\n        ${lineage.replace(/\\n/g, ' ')}`;
+           }
+        }
+      }
+      return snippet;
+    }).join('\\n\\n');
+
+    const prompt = `
+      You are an expert productivity consultant. The user has requested AI assistance for their "Attention Queue".
+      This queue consists of "Stalled Projects" (projects with zero active tasks) and "Malformed Tasks" (tasks missing required hygiene metadata).
+      
+      GLOBAL AI CONTEXT (Guiding principles & priorities):
+      """
+      ${globalContext || "(No global context defined)"}
+      """
+      
+      AVAILABLE ACTIVE CONTEXTS (For task routing):
+      ${contextSnippets || "(No contexts defined)"}
+      
+      --- STALLED PROJECTS TO FIX ---
+      ${stalledProjectSnippets || "(None)"}
+      
+      --- MALFORMED TASKS TO FIX ---
+      ${malformedTaskSnippets || "(None)"}
+      
+      Based heavily on the GLOBAL AI CONTEXT, Project-specific Contexts, and task details:
+      1. For each Stalled Project, determine if the project is actually finished (suggest "MARK_COMPLETED") OR if it needs a next step (suggest "NEW_TASK" and provide EXACTLY ONE highly actionable task title that will immediately unblock the project).
+      2. For each Malformed Task, determine if the task sounds too complex and actually requires multiple steps to complete (suggest "CONVERT_TO_PROJECT"). If it is a simple single-step action, suggest "UPDATE_METADATA". **CRITICAL: Regardless of whether you suggest UPDATE_METADATA or CONVERT_TO_PROJECT, you MUST ALWAYS provide fallback estimates for all 4 missing hygiene fields** (Context ID, Time Estimate in minutes, Importance 1-4, Urgency 1-4).
+      
+      Respond strictly in JSON format matching this exact schema:
+      {
+        "stalledProjects": [
+          {
+            "projectId": "ID of project",
+            "actionType": "NEW_TASK" or "MARK_COMPLETED",
+            "suggestedNextActionTitle": "Title of proposed unblocking task, if NEW_TASK"
+          }
+        ],
+        "malformedTasks": [
+          {
+            "taskId": "ID of task",
+            "actionType": "UPDATE_METADATA" or "CONVERT_TO_PROJECT",
+            "contextId": "ID of best matching context from the list above",
+            "timeEstimate": 15,
+            "importance": "3",
+            "urgency": "2"
+          }
+        ]
+      }
+    `;
+
+    const res = this.callGemini(prompt);
+    if (!res.success) return res;
+    
+    return { 
+      success: true, 
+      suggestions: {
+        stalledProjects: res.data.stalledProjects || [],
+        malformedTasks: res.data.malformedTasks || []
+      }
+    };
+  },
+  
+  /**
    * Rewrite AI Context based on User Correction
    */
   learnFromCorrection: function(taskId, wrongId, rightId) {
@@ -129,7 +254,8 @@ const AIAgentService = {
     
     if (!task || !rightProject) return { success: false, error: 'Missing entities' };
     
-    const rightContext = rightProject.aiContext || '';
+    const allItems = TaskService.getAllItems();
+    const rightContext = this.getContextLineage(rightProject, allItems);
     
     const prompt = `
       You are an underlying GTD application AI. The user just taught you how they categorize tasks!
@@ -212,6 +338,54 @@ const AIAgentService = {
   },
   
   /**
+   * Rewrite AI Context based on User Attention Fix Correction
+   */
+  learnFromAttentionCorrection: function(itemId, itemType, aiSuggestion, userCorrection) {
+    const settings = getSettings();
+    const globalContext = settings['GLOBAL_AI_CONTEXT'] || '';
+    
+    let itemDetails = '';
+    if (itemType === 'project') {
+       const p = ProjectService.getProject(itemId);
+       itemDetails = `Project: "${p ? p.name : itemId}"`;
+    } else {
+       const t = TaskService.getTask(itemId);
+       itemDetails = `Task: "${t ? t.title : itemId}" | Notes: "${t ? t.notes : ''}"`;
+    }
+    
+    const prompt = `
+      You are an underlying GTD application AI. The user just corrected your logic!
+      
+      ITEM DETAILS:
+      ${itemDetails}
+      
+      EVENT:
+      The AI suggested: "${aiSuggestion}"
+      The user rejected it and explicitly corrected it to: "${userCorrection}"
+      
+      CURRENT GLOBAL CONTEXT:
+      """
+      ${globalContext || "(No existing rules)"}
+      """
+      
+      Task: Rewrite the GLOBAL AI CONTEXT so that it implicitly learns exactly why the user's correction is the preferred logic for items of this nature.
+      Preserve all other existing rules in the context. Keep it concise.
+      
+      Respond strictly in JSON format matching this schema:
+      {
+        "newAiContext": "The completely rewritten global AI context string."
+      }
+    `;
+    
+    const res = this.callGemini(prompt);
+    if (res.success && res.data && res.data.newAiContext) {
+      updateSetting('GLOBAL_AI_CONTEXT', res.data.newAiContext);
+      return { success: true, newContext: res.data.newAiContext };
+    }
+    return { success: false, error: 'Failed to rewrite context: ' + (res.error || '') };
+  },
+  
+  /**
    * Generate Initial Context for user-created New Projects
    */
   generateInitialContextForNewProject: function(taskId, projectName) {
@@ -284,8 +458,199 @@ const AIAgentService = {
     } catch (e) {
       return { success: false, error: 'Analysis failed: ' + e.toString() };
     }
+  },
+
+  /**
+   * Helper payload fetcher to Google Gemini API (Safe Sequential Batching)
+   */
+  callGeminiBatch: function(prompts) {
+    const results = [];
+    
+    for (let i = 0; i < prompts.length; i++) {
+        // Built-in pacing mitigates Google Gemini Free Tier limits (15 Requests Per Minute)
+        // The natural API latency (~2-3s) combined with this sleep essentially paces it perfectly.
+        if (i > 0) Utilities.sleep(1500); 
+        
+        const res = this.callGemini(prompts[i]);
+        results.push(res);
+    }
+    
+    return results;
+  },
+
+  /**
+   * Synthesize AI Contexts Bottom-Up
+   * Recursively passes child context rulesets upward to formalize master parent contexts safely
+   * Supports 'startIndex' continuation loops to bypass 6-minute GAS timeouts.
+   */
+  synthesizeAllContexts: function(startIndex = 0) {
+    const START_TIME = Date.now();
+    const MAX_RUN_TIME = 260000; // 4.3 minutes (safely away from 6.0 min limit)
+    
+    startIndex = startIndex || 0;
+    const cache = CacheService.getUserCache();
+    
+    if (startIndex === 0) {
+        cache.put('AI_SYNTHESIS_STAGE', JSON.stringify({ message: 'Mapping database dependency tree...' }), 600);
+    }
+    
+    const allItems = TaskService.getAllItems().filter(item => !item.isDeleted && item.status !== 'completed' && item.status !== 'done' && item.status !== 'dropped');
+    
+    const childrenMap = {};
+    const itemMap = {};
+    
+    allItems.forEach(item => {
+        itemMap[item.id] = item;
+        childrenMap[item.id] = [];
+    });
+    
+    allItems.forEach(item => {
+        const pid = item.parentTaskId; 
+        if (pid && itemMap[pid]) {
+            childrenMap[pid].push(item);
+        }
+    });
+
+    const depths = {};
+    function getDepth(id) {
+        if (depths[id] !== undefined) return depths[id];
+        const children = childrenMap[id] || [];
+        if (children.length === 0) {
+            depths[id] = 0;
+            return 0;
+        }
+        let maxChildDepth = -1;
+        children.forEach(c => {
+            const cd = getDepth(c.id);
+            if (cd > maxChildDepth) maxChildDepth = cd;
+        });
+        depths[id] = maxChildDepth + 1;
+        return depths[id];
+    }
+    
+    const projectsAndFolders = allItems.filter(i => i.type === 'project' || i.type === 'folder');
+    projectsAndFolders.forEach(p => getDepth(p.id));
+    
+    const byDepth = {};
+    let maxDepth = -1;
+    projectsAndFolders.forEach(p => {
+        const d = depths[p.id];
+        if (!byDepth[d]) byDepth[d] = [];
+        byDepth[d].push(p);
+        if (d > maxDepth) maxDepth = d;
+    });
+    
+    // Linearize the tree strictly from bottom (Depth 0) to top (Depth N)
+    const flatLinearGraph = [];
+    for (let d = 0; d <= maxDepth; d++) {
+        const nodesAtDepth = byDepth[d] || [];
+        nodesAtDepth.forEach(n => flatLinearGraph.push(n));
+    }
+    
+    let totalSynthesized = 0;
+    
+    for (let i = startIndex; i < flatLinearGraph.length; i++) {
+        // Enforce script execution timeout protection
+        if (Date.now() - START_TIME > MAX_RUN_TIME) {
+            cache.put('AI_SYNTHESIS_STAGE', JSON.stringify({ message: `Avoiding script timeout... saving graph state at chunk ${i}/${flatLinearGraph.length}` }), 600);
+            return { success: true, count: totalSynthesized, hasMore: true, nextIndex: i, totalTarget: flatLinearGraph.length };
+        }
+        
+        const node = flatLinearGraph[i];
+        
+        cache.put('AI_SYNTHESIS_STAGE', JSON.stringify({ message: `Generating Ruleset for Sub-System [${i + 1}/${flatLinearGraph.length}]: "${node.title}"` }), 600);
+        
+        const children = childrenMap[node.id] || [];
+        
+        let childDescriptions = children.map(c => {
+            if (c.type === 'task') return `- TASK: "${c.title}" ${c.notes ? '(' + c.notes + ')' : ''}`;
+            const childContext = itemMap[c.id].aiContext || '(No context)';
+            return `- SUB-${c.type.toUpperCase()}: "${c.title}" Context Rules: ${childContext}`;
+        }).join('\n');
+        
+        if (children.length === 0) {
+           childDescriptions = "(This container currently lacks contents. Infer its operational intent directly from its namespace/metadata parameters.)";
+        }
+        
+        const prompt = `
+          You are an autonomous GTD AI Assistant assigned to mapping dynamic workflow architectures.
+          Generate a highly concise 1-3 sentence AI Context ruleset specifying EXACTLY what types of objectives and task methodologies belong within this structural boundary.
+          
+          STRUCTURAL BOUNDARY [${node.type.toUpperCase()}]: "${node.title}"
+          NATIVE NOTES: "${node.notes || ''}"
+          
+          CONTENTS ENCAPSULATED BY THIS BOUNDARY:
+          ${childDescriptions}
+          
+          Task: Formulate the overarching AI Context summarizing the combined objectives of its descendants seamlessly.
+          
+          Respond strictly in JSON format matching this schema:
+          { "newAiContext": "The new context string..." }
+        `;
+        
+        // Dynamic pacing to respect rate limits between sequential jumps
+        if (i > startIndex) Utilities.sleep(1500);
+        
+        const res = this.callGemini(prompt);
+        if (res.success && res.data && res.data.newAiContext) {
+            itemMap[node.id].aiContext = res.data.newAiContext;
+            TaskService.updateTask(node.id, { aiContext: res.data.newAiContext });
+            totalSynthesized++;
+        }
+    }
+    
+    // Safety check before evaluating the Global payload 
+    if (Date.now() - START_TIME > MAX_RUN_TIME) {
+         return { success: true, count: totalSynthesized, hasMore: true, nextIndex: flatLinearGraph.length, totalTarget: flatLinearGraph.length };
+    }
+    
+    // 4. Construct unified global architecture via Root dependencies
+    cache.put('AI_SYNTHESIS_STAGE', JSON.stringify({ message: 'Aggregating root structures into Global Context...' }), 600);
+    const rootNodes = projectsAndFolders.filter(p => !p.parentTaskId);
+    const rootDescriptions = rootNodes.map(r => `- Root ${r.type.toUpperCase()}: "${r.title}" | Operational Context: ${itemMap[r.id].aiContext}`).join('\n');
+    
+    const globalPrompt = `
+      You are the core logic framework driving a GTD database. The user has requested a completely updated Brain Ruleset structure.
+      
+      Here are all of their Top-Level Sub-Systems driving the engine:
+      ${rootDescriptions}
+      
+      Synthesize a comprehensive unified "GLOBAL AI CONTEXT" that fully captures the user's total worldview and systemic goals. 
+      Formulate exact logic rules for how incoming items / fresh items should be autonomously targeted, structured, estimated, and categorized dynamically over time.
+      
+      Respond strictly in JSON format matching this schema:
+      { "newGlobalContext": "The fresh overarching framework string..." }
+    `;
+    
+    const globalRes = this.callGemini(globalPrompt);
+    if (globalRes.success && globalRes.data && globalRes.data.newGlobalContext) {
+       if (typeof updateSetting === 'function') {
+           updateSetting('GLOBAL_AI_CONTEXT', globalRes.data.newGlobalContext);
+       }
+       totalSynthesized++; 
+    }
+    
+    // Signal underlying cache wipe since global sweeps aggressively rewrite values 
+    if (typeof clearDataCache === 'function') clearDataCache();
+    
+    cache.put('AI_SYNTHESIS_STAGE', JSON.stringify({ message: 'Completed successfully!' }), 600);
+    
+    return { success: true, count: totalSynthesized, hasMore: false };
   }
 };
+
+/**
+ * Endpoint for Frontend polling of live API synthesis runs
+ */
+function getSynthesisProgress() {
+    var raw = CacheService.getUserCache().get('AI_SYNTHESIS_STAGE');
+    if (raw) {
+        try {
+            return JSON.parse(raw);
+        } catch(e) {}
+    }
+    return null;
+}
 
 /**
  * Global functions exposed to the client
@@ -298,6 +663,10 @@ function suggestAlignmentForInbox(taskIds) {
   return AIAgentService.suggestAlignmentForInbox(taskIds);
 }
 
+function suggestAttentionFixes(payload) {
+  return AIAgentService.suggestAttentionFixes(payload);
+}
+
 function learnFromCorrection(taskId, wrongId, rightId) {
   return AIAgentService.learnFromCorrection(taskId, wrongId, rightId);
 }
@@ -308,6 +677,14 @@ function trainGlobalContextOnProjectMove(projectId, oldParentId, newParentId, fa
 
 function generateInitialContextForNewProject(taskId, projectName) {
   return AIAgentService.generateInitialContextForNewProject(taskId, projectName);
+}
+
+function learnFromAttentionCorrection(itemId, itemType, aiSuggestion, userCorrection) {
+  return AIAgentService.learnFromAttentionCorrection(itemId, itemType, aiSuggestion, userCorrection);
+}
+
+function teachProjectWaitReason(projectId, reason, date) {
+  return AIAgentService.teachProjectWaitReason(projectId, reason, date);
 }
 
 function getGlobalAIContext() {

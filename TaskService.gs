@@ -495,5 +495,76 @@ const TaskService = {
       row[TASK_COLS.AI_CONTEXT] = task.aiContext || '';
     }
     return row;
+  },
+
+  /**
+   * Scans raw database rows to detect critical taxonomy state errors
+   */
+  checkDatabaseIntegrity: function() {
+    const allItems = this.getAllItems();
+    
+    // Valid project types inc. folder
+    const validParentIds = new Set(
+      allItems.filter(r => (r.type === 'project' || r.type === 'folder') && !r.isDeleted).map(r => r.id)
+    );
+    
+    const violations = {
+      corruptedProjects: [],
+      orphanedTasks: []
+    };
+    
+    allItems.forEach(row => {
+      // 1. Corrupted projects
+      if (row.type === 'project' && !row.isDeleted) {
+        if (row.status !== 'active' && row.status !== 'someday' && row.status !== 'done' && row.status !== 'completed' && row.status !== 'dropped') {
+          violations.corruptedProjects.push({
+            id: row.id,
+            title: row.title,
+            currentStatus: row.status
+          });
+        }
+      }
+      
+      // 2. Orphaned tasks (parentTaskId points to non-existent/deleted parent)
+      if (row.type === 'task' && !row.isDeleted && row.parentTaskId) {
+        if (!validParentIds.has(row.parentTaskId)) {
+          violations.orphanedTasks.push({
+            id: row.id,
+            title: row.title,
+            invalidParentId: row.parentTaskId
+          });
+        }
+      }
+    });
+    
+    return {
+      success: true,
+      hasViolations: violations.corruptedProjects.length > 0 || violations.orphanedTasks.length > 0,
+      violations: violations
+    };
+  },
+
+  /**
+   * Safely patches database violations discovered by the integrity checker
+   */
+  fixDatabaseIntegrity: function() {
+    const check = this.checkDatabaseIntegrity();
+    if (!check.success || !check.hasViolations) return { success: true, fixedCount: 0 };
+    
+    let fixedCount = 0;
+    
+    // Fix corrupted projects: Force switch to 'active'
+    check.violations.corruptedProjects.forEach(vp => {
+       this.updateTask(vp.id, { status: 'active' });
+       fixedCount++;
+    });
+    
+    // Fix orphaned tasks: Strip parentTaskId (making them root inbox/next tasks)
+    check.violations.orphanedTasks.forEach(vt => {
+       this.updateTask(vt.id, { parentTaskId: '' });
+       fixedCount++;
+    });
+    
+    return { success: true, fixedCount: fixedCount };
   }
 };

@@ -89,6 +89,7 @@ const ProjectService = {
     } 
     if (updates.areaId !== undefined) taskUpdates.areaId = updates.areaId;
     if (updates.dueDate !== undefined) taskUpdates.dueDate = updates.dueDate;
+    if (updates.scheduledDate !== undefined) taskUpdates.scheduledDate = updates.scheduledDate;
     if (updates.sortOrder !== undefined) taskUpdates.sortOrder = updates.sortOrder;
     if (updates.parentProjectId !== undefined) taskUpdates.parentTaskId = updates.parentProjectId;
     if (updates.type !== undefined) taskUpdates.type = updates.type;
@@ -118,6 +119,26 @@ const ProjectService = {
   completeProject: function(projectId) {
     // Delegate to TaskService complete
     return TaskService.completeTask(projectId);
+  },
+  
+  /**
+   * Rescue projects that were converted from tasks but retained 'next' or 'inbox' statuses
+   */
+  fixCorruptedProjects: function() {
+    const allItems = TaskService.getAllItems();
+    let fixedCount = 0;
+    
+    // Find any rows tagged as 'project' that do not have valid project statuses
+    allItems.forEach(row => {
+      if (row.type === 'project' && !row.isDeleted) {
+        if (row.status !== 'active' && row.status !== 'someday' && row.status !== 'done' && row.status !== 'completed') {
+          TaskService.updateTask(row.id, { status: 'active' });
+          fixedCount++;
+        }
+      }
+    });
+    
+    return { success: true, fixed: fixedCount };
   },
   
   /**
@@ -201,3 +222,10 @@ const ProjectService = {
     };
   }
 };
+
+/**
+ * Global router export for frontend execution
+ */
+function fixCorruptedProjects() {
+  return ProjectService.fixCorruptedProjects();
+}

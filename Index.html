@@ -1279,7 +1279,7 @@
             // setupProjectDropdown(); // Removed as it was replaced by dialog-specific logic
             loadAllData();
         }
-        function loadAllData() { showLoading(true); google.script.run.withSuccessHandler(onDataLoaded).withFailureHandler(onDataError).getAllData(); }
+        function loadAllData(forceRefresh) { showLoading(true); google.script.run.withSuccessHandler(onDataLoaded).withFailureHandler(onDataError).getAllData(forceRefresh === true); }
         function onDataLoaded(d) {
             if (!d) { showToast('No data'); showLoading(false); return; } state.tasks = d.tasks || []; state.projects = d.projects || []; state.contexts = d.contexts || []; state.areas = d.areas || []; state.settings = d.settings || {};
             // Inbox Unification: logic removed
@@ -1460,7 +1460,14 @@
 
         function renderAttention() {
             var data = getAttentionItems();
-            var h = '<div class="page-header"><h2>Attention</h2><p>Items requiring maintenance</p></div>';
+            var h = '<div class="page-header" style="display:flex; justify-content:space-between; align-items:center;">';
+            h += '<div><h2>Attention</h2><p>Items requiring maintenance</p></div>';
+            
+            if (data.stalledProjects.length > 0 || data.malformedTasks.length > 0) {
+                h += '<button id="aiAttentionBtn" class="add-btn" onclick="processAttentionWithAI()" style="background:var(--primary); color:white; border:none;">';
+                h += '<span class="material-icons">psychology</span> Auto-Fix with AI</button>';
+            }
+            h += '</div>';
 
             if (data.stalledProjects.length === 0 && data.malformedTasks.length === 0) {
                 h += '<div class="empty-state"><span class="material-icons" style="color: var(--success)">check_circle</span><h3>All Systems Go!</h3><p>Your system is clean and up to date.</p></div>';
@@ -1498,6 +1505,25 @@
 
                     h += '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openItemDialog(null, \'task\', \'' + p.id + '\')">Add Action</button>';
                     h += '</div>';
+                    h += '</div>';
+                    
+                    // AI Inline Suggestion for Stalled Projects
+                    if (state.aiAttentionSuggestions && state.aiAttentionSuggestions.stalledProjects) {
+                        var sugg = state.aiAttentionSuggestions.stalledProjects.find(s => s.projectId === p.id);
+                        if (sugg) {
+                            var isComplete = sugg.actionType === 'MARK_COMPLETED';
+                            var displayTitle = isComplete ? '✅ Mark Project as Completed' : 'Add action "' + esc(sugg.suggestedNextActionTitle) + '"';
+                            
+                            h += '<div class="ai-suggestion-card" id="ai-attention-proj-' + p.id + '" style="margin-top:-8px; margin-bottom:12px; margin-left:16px; background:var(--bg-secondary); border-left:3px solid var(--primary); padding:12px; border-radius:0 4px 4px 0; font-size:13px; display:flex; align-items:center; gap:12px;">';
+                            h += '<span class="material-icons" style="color:var(--primary); font-size:18px;">psychology</span>';
+                            h += '<div style="flex:1;"><strong>AI Unblock Suggestion:</strong> <span style="color:var(--primary); font-weight:600;">' + displayTitle + '</span></div>';
+                            h += '<button onclick="event.stopPropagation(); acceptAttentionProjectAI(\'' + p.id + '\')" style="background:var(--success); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">Accept</button>';
+                            if (!isComplete) {
+                                h += '<button onclick="event.stopPropagation(); modifyAttentionProjectAI(\'' + p.id + '\')" style="background:transparent; border:1px solid var(--border-color); padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">Modify...</button>';
+                            }
+                            h += '</div>';
+                        }
+                    }
                 });
                 h += '</div>';
                 h += '<button class="add-btn" onclick="saveProjectAttentionFixes()" style="margin-top:16px; justify-content:center; background:var(--primary); color:white; border:none;"><span class="material-icons">save</span> Save Project Fixes</button>';
@@ -1581,9 +1607,35 @@
 
                     // Due (Always show)
                     h += '<span style="font-size:10px; color:var(--text-muted); margin-left:8px; margin-right:2px;">Due:</span>';
+                    h += '<span style="font-size:10px; color:var(--text-muted); margin-left:8px; margin-right:2px;">Due:</span>';
                     h += '<input type="date" class="form-control fix-due" value="' + (t.dueDate || '') + '" style="width:110px; padding:3px; font-size:12px;" onclick="event.stopPropagation()">';
 
                     h += '</div></div></div>';
+                    
+                    // AI Inline Suggestion for Tasks
+                    if (state.aiAttentionSuggestions && state.aiAttentionSuggestions.malformedTasks) {
+                        var sugg = state.aiAttentionSuggestions.malformedTasks.find(s => s.taskId === t.id);
+                        if (sugg) {
+                            var isConvert = sugg.actionType === 'CONVERT_TO_PROJECT';
+                            var displayTitle = '';
+                            if (isConvert) {
+                                displayTitle = '📁 Convert Task into a Project';
+                            } else {
+                                var contextObj = state.contexts.find(c => String(c.id) === String(sugg.contextId));
+                                var contextLabel = contextObj ? contextObj.icon + ' ' + contextObj.name : 'Unknown Context';
+                                var impLabel = {1:'Low', 2:'Nrm', 3:'Hi', 4:'Top'}[sugg.importance] || sugg.importance;
+                                var urgLabel = {1:'Low', 2:'Nrm', 3:'Hi', 4:'Crt'}[sugg.urgency] || sugg.urgency;
+                                displayTitle = contextLabel + ' &nbsp;|&nbsp; ' + sugg.timeEstimate + 'm &nbsp;|&nbsp; Imp: ' + impLabel + ' &nbsp;|&nbsp; Urg: ' + urgLabel;
+                            }
+                            
+                            h += '<div class="ai-suggestion-card" id="ai-attention-task-' + t.id + '" style="margin-top:-8px; margin-bottom:12px; margin-left:16px; background:var(--bg-secondary); border-left:3px solid var(--primary); padding:12px; border-radius:0 4px 4px 0; font-size:13px; display:flex; align-items:center; gap:12px;">';
+                            h += '<span class="material-icons" style="color:var(--primary); font-size:18px;">psychology</span>';
+                            h += '<div style="flex:1;"><strong>AI Hygiene Suggestion:</strong> <span style="font-weight:600;">' + displayTitle + '</span></div>';
+                            h += '<button onclick="event.stopPropagation(); acceptAttentionTaskAI(\'' + t.id + '\')" style="background:var(--success); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">Accept</button>';
+                            h += '<button onclick="event.stopPropagation(); modifyAttentionTaskAI(\'' + t.id + '\')" style="background:transparent; border:1px solid var(--border-color); padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">Modify...</button>';
+                            h += '</div>';
+                        }
+                    }
                 });
                 h += '</div>';
                 h += '<button class="add-btn" onclick="saveAttentionFixes()" style="margin-top:16px; justify-content:center; background:var(--primary); color:white; border:none;"><span class="material-icons">save</span> Save All Fixes</button>';
@@ -2545,8 +2597,104 @@
             }
             h += '</div>';
 
-            h += '<div class="review-section"><h3><span class="material-icons">download</span> Export & Maintenance</h3><div style="display:flex; gap:8px"><button class="btn btn-secondary" onclick="downloadExport()">Export Log</button><button class="btn btn-danger" onclick="compactDatabaseClick()">Compact Database</button></div></div>';
+            var integrityResultsHtml = state.integrityResults ? state.integrityResults : '';
+            h += '<div class="review-section"><h3><span class="material-icons">build</span> Export & Maintenance</h3>';
+            h += '<div style="display:flex; gap:8px; margin-bottom: 12px; flex-wrap:wrap;">';
+            h += '<button class="btn btn-secondary" onclick="downloadExport()">Export Log</button>';
+            h += '<button class="btn btn-danger" onclick="compactDatabaseClick()">Compact Database</button>';
+            h += '<button class="btn btn-warning" onclick="runIntegrityCheckClick()" style="background:var(--warning); color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:500; cursor:pointer;">Run DB Integrity Check</button>';
+            h += '<button class="btn" onclick="synthesizeContextsClick()" style="background:var(--primary); color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:500; cursor:pointer;"><span class="material-icons" style="font-size:16px; vertical-align:-3px; margin-right:4px;">psychology</span>Synthesize AI Brain</button>';
+            h += '</div>' + integrityResultsHtml + '</div>';
             return h;
+        }
+        
+        function runIntegrityCheckClick() {
+            state.integrityResults = '<div style="color:var(--text-muted); font-size:13px; margin-top:8px;">Running database scan...</div>';
+            renderPage('review');
+            
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!res.success) {
+                        state.integrityResults = '<div style="color:var(--text-danger); font-size:13px;">Error: ' + res.error + '</div>';
+                    } else if (!res.hasViolations) {
+                        state.integrityResults = '<div style="color:var(--text-success); font-size:13px; font-weight:500;"><span class="material-icons" style="font-size:16px; vertical-align:-3px;">check_circle</span> No corrupted projects or orphaned tasks found!</div>';
+                    } else {
+                        var c = res.violations.corruptedProjects.length;
+                        var o = res.violations.orphanedTasks.length;
+                        var html = '<div style="background:var(--bg-secondary); border-left:3px solid var(--text-danger); padding:12px; border-radius:4px; font-size:13px;">';
+                        html += '<div style="font-weight:600; margin-bottom:8px; color:var(--text-danger);">Found ' + (c + o) + ' DB Violations:</div>';
+                        if (c > 0) html += '<div>&bull; ' + c + ' corrupted projects (missing active status)</div>';
+                        if (o > 0) html += '<div>&bull; ' + o + ' orphaned tasks (parent project deleted)</div>';
+                        html += '<div style="margin-top:12px;"><button onclick="autoFixIntegrityClick()" style="background:var(--primary); color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">Auto-Fix Database</button></div>';
+                        html += '</div>';
+                        state.integrityResults = html;
+                    }
+                    renderPage('review');
+                })
+                .checkDatabaseIntegrity();
+        }
+
+        function autoFixIntegrityClick() {
+            state.integrityResults = '<div style="color:var(--text-muted); font-size:13px; margin-top:8px;">Running auto-fix routine...</div>';
+            renderPage('review');
+            
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res.success) {
+                        state.integrityResults = '<div style="color:var(--text-success); font-size:13px; font-weight:500;"><span class="material-icons" style="font-size:16px; vertical-align:-3px;">check_circle</span> Successfully repaired ' + res.fixedCount + ' database entries! Refreshing data...</div>';
+                        renderPage('review');
+                        loadAllData(); 
+                    }
+                })
+                .fixDatabaseIntegrity();
+        }
+
+        var synthesisPollTimer = null;
+        function synthesizeContextsClick() {
+            state.integrityResults = '<div id="synth-status" style="color:var(--primary); font-size:13px; margin-top:8px;"><span class="material-icons" style="font-size:16px; margin-right:4px; vertical-align:-3px; animation:spin 2s linear infinite;">sync</span> Initiating Brain Synthesis...</div>';
+            renderPage('review');
+            
+            if (synthesisPollTimer) clearInterval(synthesisPollTimer);
+            synthesisPollTimer = setInterval(function() {
+                google.script.run.withSuccessHandler(function(res) {
+                    if (res && res.message) {
+                        var el = document.getElementById('synth-status');
+                        if (el) el.innerHTML = '<span class="material-icons" style="font-size:16px; margin-right:4px; vertical-align:-3px; animation:spin 2s linear infinite;">sync</span> ' + res.message;
+                    }
+                }).getSynthesisProgress();
+            }, 1500);
+            
+            doSynthesisLoop(0, 0);
+        }
+        
+        function doSynthesisLoop(startIndex, cumulativeCount) {
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) {
+                        var total = cumulativeCount + res.count;
+                        if (res.hasMore) {
+                            var progMsg = '<div id="synth-status" style="color:var(--warning); font-size:13px; margin-top:8px;"><span class="material-icons" style="font-size:16px; margin-right:4px; vertical-align:-3px; animation:spin 2s linear infinite;">sync</span> Safely bypassing API timeouts... Re-spooling Engine (Progress: ' + res.nextIndex + '/' + res.totalTarget + ')</div>';
+                            state.integrityResults = progMsg;
+                            renderPage('review');
+                            doSynthesisLoop(res.nextIndex, total);
+                        } else {
+                            if (synthesisPollTimer) clearInterval(synthesisPollTimer);
+                            state.integrityResults = '<div style="color:var(--text-success); font-size:13px; font-weight:500;"><span class="material-icons" style="font-size:16px; vertical-align:-3px;">check_circle</span> Synthesized ' + total + ' total AI systems bottom-up!</div>';
+                            renderPage('review');
+                            loadAllData(true); 
+                        }
+                    } else {
+                        if (synthesisPollTimer) clearInterval(synthesisPollTimer);
+                        state.integrityResults = '<div style="color:var(--text-danger); font-size:13px;">Error generating tree: ' + (res ? res.error : 'Network Timeout') + '</div>';
+                        renderPage('review');
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    if (synthesisPollTimer) clearInterval(synthesisPollTimer);
+                    state.integrityResults = '<div style="color:var(--text-danger); font-size:13px;">Critical execution error: ' + err.message + '</div>';
+                    renderPage('review');
+                })
+                .synthesizeAllContexts(startIndex);
         }
         function renderContexts() { var h = '<div class="page-header"><h2>Contexts</h2><p>Where you can do tasks</p></div><div class="task-list">'; state.contexts.forEach(function (c) { var n = state.tasks.filter(function (t) { return t.contextId === c.id && t.status === 'next'; }).length; h += '<div class="task-item"><span class="context-icon">' + c.icon + '</span><div class="task-content"><div class="task-title">' + esc(c.name) + '</div></div><span class="task-meta">' + n + ' next</span></div>'; }); h += '</div><button class="add-btn" onclick="addContext()"><span class="material-icons">add</span> Add Context</button>'; return h; }
         function renderAreas() { var h = '<div class="page-header"><h2>Areas</h2><p>Ongoing responsibilities</p></div><div class="task-list">'; state.areas.forEach(function (a) { var n = state.projects.filter(function (p) { return p.areaId === a.id && p.status === 'active'; }).length; h += '<div class="task-item"><span class="context-icon">' + a.icon + '</span><div class="task-content"><div class="task-title">' + esc(a.name) + '</div></div><span class="task-meta">' + n + ' projects</span></div>'; }); h += '</div><button class="add-btn" onclick="addArea()"><span class="material-icons">add</span> Add Area</button>'; return h; }
@@ -2917,6 +3065,311 @@
                     resultDiv.innerHTML = '<div style="color:var(--danger)">Failed: ' + e + '</div>';
                 })
                 .generateProjectInsights(id);
+        }
+
+        function processAttentionWithAI() {
+            var data = getAttentionItems();
+            if(!data.stalledProjects.length && !data.malformedTasks.length) { showToast('Queue is empty'); return; }
+            
+            var btn = document.getElementById('aiAttentionBtn');
+            if (btn) {
+                btn.innerHTML = '<span class="material-icons spinning" style="font-size:16px;">refresh</span> Processing...';
+                btn.disabled = true;
+            }
+            showToast('Asking AI to process Attention Queue...', 4000);
+            
+            var payload = {
+                stalledProjectIds: data.stalledProjects.map(p => p.id),
+                malformedTaskIds: data.malformedTasks.map(item => item.task.id)
+            };
+            
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (btn) {
+                        btn.innerHTML = '<span class="material-icons">psychology</span> Auto-Fix with AI';
+                        btn.disabled = false;
+                    }
+                    if (res && res.success) {
+                        state.aiAttentionSuggestions = res.suggestions;
+                        var count = (res.suggestions.stalledProjects?.length || 0) + (res.suggestions.malformedTasks?.length || 0);
+                        showToast('AI generated fixes for ' + count + ' items.');
+                        renderPage(state.currentPage);
+                    } else {
+                        showToast('AI API Error: ' + (res ? res.error : 'Unknown'));
+                    }
+                })
+                .withFailureHandler(function(e) {
+                    if (btn) {
+                        btn.innerHTML = '<span class="material-icons">psychology</span> Auto-Fix with AI';
+                        btn.disabled = false;
+                    }
+                    showToast('Connection failed: ' + e);
+                })
+                .suggestAttentionFixes(payload);
+        }
+
+        function acceptAttentionProjectAI(projectId) {
+            if (!state.aiAttentionSuggestions || !state.aiAttentionSuggestions.stalledProjects) return;
+            var sugg = state.aiAttentionSuggestions.stalledProjects.find(s => s.projectId === projectId);
+            if (!sugg) return;
+            
+            if (sugg.actionType === 'MARK_COMPLETED') {
+                const p = state.projects.find(p => p.id === projectId);
+                if (p) p.status = 'completed';
+                requestQueue.enqueue('updateProject', { id: projectId, updates: { status: 'completed' } }, null, 'AI Completed Project');
+                showToast('Project completed!');
+            } else {
+                var tempTaskId = 'temp-task-' + Date.now();
+                var newTaskData = {
+                    title: sugg.suggestedNextActionTitle,
+                    type: 'task',
+                    status: 'next',
+                    parentTaskId: projectId
+                };
+                
+                state.tasks.push({ id: tempTaskId, title: sugg.suggestedNextActionTitle, type: 'task', status: 'next', parentTaskId: projectId });
+                requestQueue.enqueue('createTask', newTaskData, tempTaskId, 'AI Unblock: ' + sugg.suggestedNextActionTitle);
+                showToast('Task added. Project unblocked!');
+            }
+            
+            state.aiAttentionSuggestions.stalledProjects = state.aiAttentionSuggestions.stalledProjects.filter(s => s.projectId !== projectId);
+            renderPage(state.currentPage);
+        }
+
+        function modifyAttentionProjectAI(projectId) {
+            var container = document.getElementById('ai-attention-proj-' + projectId);
+            if (!container) return;
+            var sugg = state.aiAttentionSuggestions.stalledProjects.find(s => s.projectId === projectId);
+            var title = sugg && sugg.suggestedNextActionTitle ? sugg.suggestedNextActionTitle : '';
+            
+            var html = '<div style="flex:1;"><strong>Modify AI Action:</strong></div>';
+            html += '<input type="text" id="ai-mod-proj-title-' + projectId + '" class="form-control" value="' + esc(title) + '" style="flex:2; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            html += '<button onclick="event.stopPropagation(); submitAttentionProjectAIModification(\'' + projectId + '\')" style="background:var(--primary); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">Save Task</button>';
+            html += '<button onclick="event.stopPropagation(); forceCompleteAttentionProjectAI(\'' + projectId + '\')" style="background:var(--success); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">Mark Completed Instead</button>';
+            html += '<button onclick="event.stopPropagation(); showScheduleWaitAttentionProjectAI(\'' + projectId + '\')" style="background:var(--warning); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">Schedule & Wait Instead...</button>';
+            html += '<button onclick="event.stopPropagation(); renderPage(state.currentPage);" style="background:transparent; border:none; cursor:pointer;"><span class="material-icons" style="font-size:16px;">close</span></button>';
+            
+            container.innerHTML = html;
+        }
+
+        function showScheduleWaitAttentionProjectAI(projectId) {
+            var container = document.getElementById('ai-attention-proj-' + projectId);
+            if (!container) return;
+            
+            var html = '<div style="flex:1;"><strong>Schedule & Wait:</strong></div>';
+            html += '<input type="date" id="ai-wait-proj-date-' + projectId + '" class="form-control" style="width:110px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            html += '<input type="text" id="ai-wait-proj-reason-' + projectId + '" class="form-control" placeholder="Reason for waiting..." style="flex:2; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            html += '<button onclick="event.stopPropagation(); submitScheduleWaitAttentionProjectAI(\'' + projectId + '\')" style="background:var(--primary); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">Save Wait</button>';
+            html += '<button onclick="event.stopPropagation(); renderPage(state.currentPage);" style="background:transparent; border:none; cursor:pointer;"><span class="material-icons" style="font-size:16px;">close</span></button>';
+            
+            container.innerHTML = html;
+        }
+
+        function submitScheduleWaitAttentionProjectAI(projectId) {
+            var dateInput = document.getElementById('ai-wait-proj-date-' + projectId);
+            var reasonInput = document.getElementById('ai-wait-proj-reason-' + projectId);
+            
+            if (!dateInput || !dateInput.value || !reasonInput || !reasonInput.value.trim()) {
+                showToast("Date and Reason are required!");
+                return;
+            }
+            
+            var scheduleDate = dateInput.value;
+            var reason = reasonInput.value.trim();
+            
+            var p = state.projects.find(proj => proj.id === projectId);
+            if (p) p.scheduledDate = scheduleDate;
+            
+            requestQueue.enqueue('updateProject', { id: projectId, updates: { scheduledDate: scheduleDate } }, null, 'User Overrode: Scheduled Project');
+            
+            if (state.aiAttentionSuggestions && state.aiAttentionSuggestions.stalledProjects) {
+               state.aiAttentionSuggestions.stalledProjects = state.aiAttentionSuggestions.stalledProjects.filter(s => s.projectId !== projectId);
+            }
+            showToast('Project scheduled! Instructing AI...');
+            renderPage(state.currentPage);
+            
+            google.script.run
+                .withSuccessHandler(function(res) { if (res && res.success) console.log('AI Learned Wait Reason:', res); })
+                .teachProjectWaitReason(projectId, reason, scheduleDate);
+        }
+
+        function forceCompleteAttentionProjectAI(projectId) {
+            var sugg = state.aiAttentionSuggestions.stalledProjects.find(s => s.projectId === projectId);
+            var aiTitle = sugg && sugg.suggestedNextActionTitle ? sugg.suggestedNextActionTitle : '';
+            
+            const p = state.projects.find(p => p.id === projectId);
+            if (p) p.status = 'completed';
+            requestQueue.enqueue('updateProject', { id: projectId, updates: { status: 'completed' } }, null, 'User Overrode: Completed Project');
+            
+            state.aiAttentionSuggestions.stalledProjects = state.aiAttentionSuggestions.stalledProjects.filter(s => s.projectId !== projectId);
+            showToast('Project completed! Training AI...');
+            renderPage(state.currentPage);
+            
+            var userCorrectionStr = "MARK_COMPLETED (I decided this project is already done)";
+            var aiSuggestionStr = "NEW_TASK: " + aiTitle;
+            
+            google.script.run
+                .withSuccessHandler(function(res) { if (res && res.success) console.log('AI Learned Unblock Correction:', res); })
+                .learnFromAttentionCorrection(projectId, 'project', aiSuggestionStr, userCorrectionStr);
+        }
+
+        function submitAttentionProjectAIModification(projectId) {
+            var input = document.getElementById('ai-mod-proj-title-' + projectId);
+            if (!input || !input.value.trim()) return;
+            
+            var userTitle = input.value.trim();
+            var sugg = state.aiAttentionSuggestions.stalledProjects.find(s => s.projectId === projectId);
+            var aiTitle = sugg && sugg.suggestedNextActionTitle ? sugg.suggestedNextActionTitle : '';
+            
+            var tempTaskId = 'temp-task-' + Date.now();
+            var newTaskData = { title: userTitle, type: 'task', status: 'next', parentTaskId: projectId };
+            
+            state.tasks.push({ id: tempTaskId, title: userTitle, type: 'task', status: 'next', parentTaskId: projectId });
+            requestQueue.enqueue('createTask', newTaskData, tempTaskId, 'User Unblock: ' + userTitle);
+            
+            state.aiAttentionSuggestions.stalledProjects = state.aiAttentionSuggestions.stalledProjects.filter(s => s.projectId !== projectId);
+            showToast('Task added. Training AI Context...');
+            renderPage(state.currentPage);
+            
+            var userCorrectionStr = "NEW_TASK: " + userTitle;
+            var aiSuggestionStr = sugg.actionType === 'MARK_COMPLETED' ? "MARK_COMPLETED" : "NEW_TASK: " + aiTitle;
+            
+            google.script.run
+                .withSuccessHandler(function(res) { if (res && res.success) console.log('AI Learned Unblock Correction:', res); })
+                .learnFromAttentionCorrection(projectId, 'project', aiSuggestionStr, userCorrectionStr);
+        }
+
+        function acceptAttentionTaskAI(taskId) {
+            if (!state.aiAttentionSuggestions || !state.aiAttentionSuggestions.malformedTasks) return;
+            var sugg = state.aiAttentionSuggestions.malformedTasks.find(s => s.taskId === taskId);
+            if (!sugg) return;
+            
+            var task = state.tasks.find(t => t.id === taskId);
+            if (!task) return;
+            
+            if (sugg.actionType === 'CONVERT_TO_PROJECT') {
+                task.type = 'project'; // Optimistic
+                
+                requestQueue.enqueue('updateTask', { id: taskId, updates: { type: 'project' } }, null, 'AI Convert to Project');
+                showToast('Task converted to Project!');
+                
+                // Spawn context instantly for the new paradigm since it is fundamentally a routing operation!
+                google.script.run
+                    .withSuccessHandler(function(res) {
+                        if (res && res.success) {
+                            requestQueue.enqueue('updateProject', { id: taskId, updates: { aiContext: res.newContext } }, null, 'AI Init Context');
+                        }
+                    })
+                    .generateInitialContextForNewProject(taskId, task.title);
+
+            } else {
+                var updates = {};
+                if (sugg.contextId) updates.contextId = sugg.contextId;
+                if (sugg.timeEstimate) updates.timeEstimate = sugg.timeEstimate;
+                if (sugg.importance) updates.importance = sugg.importance;
+                if (sugg.urgency) updates.urgency = sugg.urgency;
+                
+                Object.assign(task, updates);
+                requestQueue.enqueue('updateTask', { id: taskId, updates: updates }, null, 'AI Hygiene: ' + task.title);
+                showToast('Hygiene metadata applied!');
+            }
+            
+            state.aiAttentionSuggestions.malformedTasks = state.aiAttentionSuggestions.malformedTasks.filter(s => s.taskId !== taskId);
+            renderPage(state.currentPage);
+        }
+
+        function modifyAttentionTaskAI(taskId) {
+            var container = document.getElementById('ai-attention-task-' + taskId);
+            if (!container) return;
+            var sugg = state.aiAttentionSuggestions.malformedTasks.find(s => s.taskId === taskId);
+            if (!sugg) return;
+            
+            var html = '<div style="flex:1; display:flex; gap:8px; align-items:center;">';
+            html += '<strong>Modify:</strong> ';
+            
+            html += '<select id="ai-mod-task-ctx-' + taskId + '" class="form-control" style="width:110px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            html += '<option value="">Context...</option>';
+            state.contexts.forEach(c => {
+                var sel = (String(c.id) === String(sugg.contextId)) ? 'selected' : '';
+                html += '<option value="' + c.id + '" ' + sel + '>' + c.icon + ' ' + c.name + '</option>';
+            });
+            html += '</select>';
+            
+            html += '<input type="number" id="ai-mod-task-time-' + taskId + '" value="' + (sugg.timeEstimate || '') + '" class="form-control" style="width:60px; padding:4px; font-size:12px;" placeholder="Mins" onclick="event.stopPropagation()">';
+            
+            var impOpts = [1,2,3,4].map(v => '<option value="'+v+'" '+(String(sugg.importance)===String(v)?'selected':'')+'>'+{1:'Low',2:'Nrm',3:'Hi',4:'Top'}[v]+'</option>').join('');
+            html += '<select id="ai-mod-task-imp-' + taskId + '" class="form-control" style="width:60px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">' + impOpts + '</select>';
+            
+            var urgOpts = [1,2,3,4].map(v => '<option value="'+v+'" '+(String(sugg.urgency)===String(v)?'selected':'')+'>'+{1:'Low',2:'Nrm',3:'Hi',4:'Crt'}[v]+'</option>').join('');
+            html += '<select id="ai-mod-task-urg-' + taskId + '" class="form-control" style="width:60px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">' + urgOpts + '</select>';
+            
+            html += '<button onclick="event.stopPropagation(); submitAttentionTaskAIModification(\'' + taskId + '\')" style="background:var(--primary); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">Save</button>';
+            html += '<button onclick="event.stopPropagation(); forceConvertAttentionTaskAI(\'' + taskId + '\')" style="background:var(--warning); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">Convert to Project</button>';
+            html += '<button onclick="event.stopPropagation(); renderPage(state.currentPage);" style="background:transparent; border:none; cursor:pointer;"><span class="material-icons" style="font-size:16px;">close</span></button>';
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+
+        function forceConvertAttentionTaskAI(taskId) {
+            var sugg = state.aiAttentionSuggestions.malformedTasks.find(s => s.taskId === taskId);
+            var task = state.tasks.find(t => t.id === taskId);
+            if (!task || !sugg) return;
+            
+            task.type = 'project';
+            task.status = 'active';
+            requestQueue.enqueue('updateTask', { id: taskId, updates: { type: 'project', status: 'active' } }, null, 'User Overrode: Convert to Project');
+            
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) {
+                        requestQueue.enqueue('updateProject', { id: taskId, updates: { aiContext: res.newContext } }, null, 'AI Init Context');
+                    }
+                })
+                .generateInitialContextForNewProject(taskId, task.title);
+
+            state.aiAttentionSuggestions.malformedTasks = state.aiAttentionSuggestions.malformedTasks.filter(s => s.taskId !== taskId);
+            showToast('Task converted! Training AI...');
+            renderPage(state.currentPage);
+            
+            var userCorrectionStr = "CONVERT_TO_PROJECT (This task was too complex)";
+            var aiSuggestionStr = sugg.actionType === 'CONVERT_TO_PROJECT' ? "CONVERT_TO_PROJECT" : "UPDATE_METADATA: Context " + sugg.contextId + ", Time " + sugg.timeEstimate + ", Imp " + sugg.importance + ", Urg " + sugg.urgency;
+            
+            google.script.run
+                .withSuccessHandler(function(res) { if (res && res.success) console.log('AI Learned Hygiene Correction:', res); })
+                .learnFromAttentionCorrection(taskId, 'task', aiSuggestionStr, userCorrectionStr);
+        }
+
+        function submitAttentionTaskAIModification(taskId) {
+            var ctxInput = document.getElementById('ai-mod-task-ctx-' + taskId);
+            var timeInput = document.getElementById('ai-mod-task-time-' + taskId);
+            var impInput = document.getElementById('ai-mod-task-imp-' + taskId);
+            var urgInput = document.getElementById('ai-mod-task-urg-' + taskId);
+            
+            var sugg = state.aiAttentionSuggestions.malformedTasks.find(s => s.taskId === taskId);
+            var task = state.tasks.find(t => t.id === taskId);
+            if (!task) return;
+            
+            var updates = {
+                contextId: ctxInput ? ctxInput.value : undefined,
+                timeEstimate: timeInput ? timeInput.value : undefined,
+                importance: impInput ? impInput.value : undefined,
+                urgency: urgInput ? urgInput.value : undefined
+            };
+            
+            Object.assign(task, updates);
+            requestQueue.enqueue('updateTask', { id: taskId, updates: updates }, null, 'User Hygiene: ' + task.title);
+            
+            state.aiAttentionSuggestions.malformedTasks = state.aiAttentionSuggestions.malformedTasks.filter(s => s.taskId !== taskId);
+            showToast('Hygiene saved. Training AI...');
+            renderPage(state.currentPage);
+            
+            var userCorrectionStr = "UPDATE_METADATA: Context " + updates.contextId + ", Time " + updates.timeEstimate + ", Imp " + updates.importance + ", Urg " + updates.urgency;
+            var aiSuggestionStr = sugg.actionType === 'CONVERT_TO_PROJECT' ? "CONVERT_TO_PROJECT" : "UPDATE_METADATA: Context " + sugg.contextId + ", Time " + sugg.timeEstimate + ", Imp " + sugg.importance + ", Urg " + sugg.urgency;
+            
+            google.script.run
+                .withSuccessHandler(function(res) { if (res && res.success) console.log('AI Learned Hygiene Correction:', res); })
+                .learnFromAttentionCorrection(taskId, 'task', aiSuggestionStr, userCorrectionStr);
         }
 
         function processInboxWithAI() {

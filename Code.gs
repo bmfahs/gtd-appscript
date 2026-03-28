@@ -186,14 +186,18 @@ function clearDataCache() {
 /**
  * Get all data for initial load
  */
-function getAllData() {
+function getAllData(forceRefresh) {
   Logger.log('getAllData() called');
   try {
     const cache = CacheService.getUserCache();
-    const cached = cache.get('gtd_all_data');
-    if (cached) {
-      Logger.log('Serving data from cache');
-      return JSON.parse(cached);
+    if (forceRefresh) {
+        cache.remove('gtd_all_data');
+    } else {
+        const cached = cache.get('gtd_all_data');
+        if (cached) {
+          Logger.log('Serving data from cache');
+          return JSON.parse(cached);
+        }
     }
 
     // Optimization: Read Tasks sheet once for both Tasks and Projects
@@ -849,4 +853,20 @@ function markReviewedWrapper(id) {
     return TaskService.updateTask(id, {
         lastReviewed: today
     });
+}
+
+function checkDatabaseIntegrity() {
+  return TaskService.checkDatabaseIntegrity();
+}
+
+function fixDatabaseIntegrity() {
+  return TaskService.fixDatabaseIntegrity();
+}
+
+function synthesizeAllContexts(startIndex) {
+  return AIAgentService.synthesizeAllContexts(startIndex);
+}
+
+function getSynthesisProgress() {
+  return AIAgentService.getSynthesisProgress();
 }
