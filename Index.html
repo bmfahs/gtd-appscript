@@ -1061,6 +1061,12 @@
                         <span class="material-icons">category</span><span>Areas</span>
                     </a>
                 </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">System</div>
+                    <a href="#" class="nav-item" onclick="openAISystemManager(); return false;">
+                        <span class="material-icons" style="color:var(--primary);">psychology</span><span>Global AI Brain</span>
+                    </a>
+                </div>
             </nav>
             <main class="content" id="content">
                 <div class="loading" id="loading">
@@ -1070,6 +1076,30 @@
                 <div id="pageContent"></div>
             </main>
         </div>
+        <!-- Global AI Manager Dialog -->
+        <div id="aiSystemModal" class="dialog-overlay" style="display: none;"
+            onclick="if(event.target === this) document.getElementById('aiSystemModal').style.display='none'">
+            <div class="dialog">
+                <div class="dialog-header">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <h2 style="color:var(--primary);">Global AI Context Manager</h2>
+                    </div>
+                    <button class="btn-icon" onclick="document.getElementById('aiSystemModal').style.display='none'"><span
+                            class="material-icons">close</span></button>
+                </div>
+                <div class="dialog-content">
+                    <div class="form-group">
+                        <label for="globalAIContext">Global AI Context & Priorities</label>
+                        <textarea id="globalAIContext" class="form-control" rows="8" placeholder="Define overarching rules, priorities, and goals for your GTD system here."></textarea>
+                        <small style="color:var(--text-muted); display:block; margin-top:5px;">This context acts as the highest-level brain for the AI, influencing all project insights and Inbox routing decisions.</small>
+                    </div>
+                    <div class="form-actions" style="margin-top: 20px;">
+                        <button class="btn btn-primary" onclick="saveGlobalAIContext()" id="saveGlobalAIBtn">Save Global Context</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Unified Item Dialog -->
         <div id="itemDialog" class="dialog-overlay" style="display: none;"
             onclick="if(event.target === this) closeItemDialog()">
@@ -1189,6 +1219,16 @@
                             <label for="itemCadence">Review Frequency (Weeks)</label>
                             <input type="number" id="itemCadence" class="form-control" min="1" value="1"
                                 placeholder="1 = Weekly">
+                        </div>
+                        <div class="form-group">
+                            <label for="itemAIContext">Project AI Context (Rules & Objectives)</label>
+                            <textarea id="itemAIContext" class="form-control" rows="4" placeholder="Specific context to guide AI suggestions inside this project..."></textarea>
+                        </div>
+                        <div class="form-group" id="aiInsightsGroup" style="display:none; margin-top:10px;">
+                            <button type="button" class="btn btn-secondary" onclick="generateInsightsForItem()" id="generateInsightsBtn" style="width:100%; justify-content:center; gap:8px;">
+                                <span class="material-icons" style="font-size:16px; color:var(--primary);">psychology</span> Generate Project Actions
+                            </button>
+                            <div id="aiInsightsResult" style="margin-top:10px; padding:12px; background:var(--bg-secondary); border-radius:var(--border-radius); font-size:13px; display:none;"></div>
                         </div>
                     </div>
 
@@ -1767,8 +1807,10 @@
             var t = getInboxTasks();
             var h = '<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">';
             h += '<div><h2>Inbox</h2><p>Capture everything, process later</p></div>';
+            h += '<div style="display:flex; gap:8px;">';
+            h += '<button class="btn-icon" onclick="processInboxWithAI()" title="Auto-Process Inbox" style="background:var(--primary); color:white; padding:8px; border-radius:50%;"><span class="material-icons">psychology</span></button>';
             h += '<button class="btn-icon" onclick="loadAllData()" title="Refresh Inbox" style="background:var(--bg-tertiary); padding:8px; border-radius:50%;"><span class="material-icons">refresh</span></button>';
-            h += '</div>';
+            h += '</div></div>';
 
             if (t.length === 0) {
                 h += '<div class="empty-state"><span class="material-icons">inbox</span><h3>Inbox Zero!</h3><p>Everything processed.</p></div>';
@@ -1801,6 +1843,8 @@
             if (t.emailThreadId) {
                 h += ' <a href="#" onclick="event.stopPropagation(); openGmail(\'' + t.emailThreadId + '\'); return false;" class="email-link-icon" title="Open in Gmail"><span class="material-icons" style="font-size: 16px; vertical-align: middle; color: var(--primary-color);">mail</span></a>';
             }
+            // AI Align Icon
+            h += ' <a href="#" onclick="event.stopPropagation(); suggestInboxAlignment(\'' + t.id + '\'); return false;" class="email-link-icon" title="AI Align"><span class="material-icons" style="font-size: 16px; vertical-align: middle; color: var(--primary);">auto_awesome</span></a>';
             h += '</div>';
             // Status (Moved to Top Row)
             h += '<select class="form-control fix-status" style="width:110px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
@@ -1898,6 +1942,29 @@
             h += '</div>';
 
             h += '</div>'; // End Row 3
+
+            // AI Suggestion Container
+            if (!state.aiSuggestions) state.aiSuggestions = {};
+            var sugg = state.aiSuggestions[t.id];
+            
+            if (sugg) {
+                var projectName = sugg.suggestedAction === 'EXISTING_PROJECT' ? 
+                    (state.projects.find(p => p.id === sugg.projectId)?.name || sugg.projectId) : 
+                    sugg.newProjectName;
+                
+                h += '<div id="ai-suggestion-' + t.id + '" style="display:flex; padding:12px; margin-top:12px; background:var(--bg-tertiary); border-radius:8px; align-items:center; justify-content:space-between; font-size:13px;" onclick="event.stopPropagation()">';
+                
+                h += '<div style="flex:1;">✨ <strong>AI Suggests:</strong> Route to "' + esc(projectName) + '" <br><span style="color:var(--text-muted); font-size:11px;">' + esc(sugg.reasoning) + '</span></div>';
+                
+                h += '<div style="display:flex; gap:8px;">';
+                h += "<div style='display:none' id='ai-suggestion-data-" + t.id + "'>" + esc(JSON.stringify(sugg)) + "</div>";
+                h += '<button onclick="event.stopPropagation(); acceptAIAlignment(\'' + t.id + '\')" style="background:var(--primary); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">Accept</button>';
+                h += '<button onclick="event.stopPropagation(); modifyAIAlignment(\'' + t.id + '\')" style="background:var(--bg-secondary); color:var(--text-primary); border:1px solid var(--border-color); padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">Modify...</button>';
+                h += '</div>';
+                h += '</div>';
+            } else {
+                h += '<div id="ai-suggestion-' + t.id + '" style="display:none; padding:12px; margin-top:12px; background:var(--bg-tertiary); border-radius:8px; align-items:center; justify-content:space-between; font-size:13px;" onclick="event.stopPropagation()"></div>';
+            }
 
             h += '</div>'; // End Container
             return h;
@@ -2655,6 +2722,16 @@
                 // Project specifics
                 document.getElementById('itemArea').value = item.areaId || '';
                 document.getElementById('itemCadence').value = item.reviewCadence || '1';
+                document.getElementById('itemAIContext').value = item.aiContext || '';
+                
+                // Show AI Insights button only if we have context
+                if ((item.aiContext || state.settings.GLOBAL_AI_CONTEXT) && item.id && !item.id.startsWith('temp-')) {
+                    document.getElementById('aiInsightsGroup').style.display = 'block';
+                    document.getElementById('aiInsightsResult').style.display = 'none';
+                    document.getElementById('aiInsightsResult').innerHTML = '';
+                } else {
+                    document.getElementById('aiInsightsGroup').style.display = 'none';
+                }
 
                 // Common
                 document.getElementById('itemDueDate').value = item.dueDate || '';
@@ -2701,6 +2778,8 @@
                 starBtn.style.color = 'var(--text-muted)';
                 starBtn.dataset.starred = "false";
                 document.getElementById('itemArea').value = '';
+                document.getElementById('itemAIContext').value = '';
+                document.getElementById('aiInsightsGroup').style.display = 'none';
                 document.getElementById('itemDueDate').value = '';
                 document.getElementById('itemScheduledDate').value = '';
 
@@ -2763,6 +2842,319 @@
             }
         }
 
+        function openAISystemManager() {
+            document.getElementById('aiSystemModal').style.display = 'flex';
+            document.getElementById('globalAIContext').value = state.settings.GLOBAL_AI_CONTEXT || '';
+        }
+
+        function saveGlobalAIContext() {
+            var context = document.getElementById('globalAIContext').value;
+            var btn = document.getElementById('saveGlobalAIBtn');
+            btn.innerHTML = '<span class="material-icons spinning">refresh</span> Saving...';
+            btn.disabled = true;
+            
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    btn.innerHTML = 'Save Global Context';
+                    btn.disabled = false;
+                    if(res && res.success) {
+                        state.settings.GLOBAL_AI_CONTEXT = context;
+                        document.getElementById('aiSystemModal').style.display = 'none';
+                        showToast('Global AI Context saved');
+                    } else {
+                        alert('Error saving global context');
+                    }
+                })
+                .withFailureHandler(function(e) {
+                    btn.innerHTML = 'Save Global Context';
+                    btn.disabled = false;
+                    alert('Failed: ' + e);
+                })
+                .updateGlobalAIContext(context);
+        }
+
+        function generateInsightsForItem() {
+            const id = state.currentItem ? state.currentItem.id : null;
+            if (!id || id.startsWith('temp-')) {
+                alert('Please save the project first before generating insights.');
+                return;
+            }
+            
+            const btn = document.getElementById('generateInsightsBtn');
+            const resultDiv = document.getElementById('aiInsightsResult');
+            
+            btn.innerHTML = '<span class="material-icons spinning" style="font-size:16px;">refresh</span> Generating...';
+            btn.disabled = true;
+            resultDiv.style.display = 'none';
+            resultDiv.innerHTML = '';
+            
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    btn.innerHTML = '<span class="material-icons" style="font-size:16px; color:var(--primary);">psychology</span> Generate Project Actions';
+                    btn.disabled = false;
+                    
+                    if (!res.success) {
+                        resultDiv.style.display = 'block';
+                        resultDiv.innerHTML = '<div style="color:var(--danger)">Error: ' + res.error + '</div>';
+                        return;
+                    }
+                    
+                    let html = '<strong>Next Steps:</strong><ul>';
+                    (res.nextSteps || []).forEach(s => html += '<li>' + s + '</li>');
+                    html += '</ul><strong>Focus Areas:</strong><ul>';
+                    (res.focusAreas || []).forEach(f => html += '<li>' + f + '</li>');
+                    html += '</ul><strong>Suggested Tasks:</strong><ul>';
+                    (res.suggestedTasks || []).forEach(t => html += '<li>' + t + '</li>');
+                    html += '</ul>';
+                    
+                    resultDiv.style.display = 'block';
+                    resultDiv.innerHTML = html;
+                })
+                .withFailureHandler(function(e) {
+                    btn.innerHTML = '<span class="material-icons" style="font-size:16px; color:var(--primary);">psychology</span> Generate Project Actions';
+                    btn.disabled = false;
+                    resultDiv.style.display = 'block';
+                    resultDiv.innerHTML = '<div style="color:var(--danger)">Failed: ' + e + '</div>';
+                })
+                .generateProjectInsights(id);
+        }
+
+        function processInboxWithAI() {
+            var tasks = getInboxTasks();
+            if(!tasks.length) { showToast('Inbox is empty'); return; }
+            
+            showToast('Asking AI to process Inbox...', 4000);
+            
+            var taskIds = tasks.map(x => x.id);
+            
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if(!res || !res.success) { 
+                        var err = res && res.error ? res.error : 'Unknown error (No serialized object return)';
+                        alert('AI Error: ' + err); 
+                        return; 
+                    }
+                    
+                    showToast('AI suggestions ready!');
+                    
+                    if (!state.aiSuggestions) state.aiSuggestions = {};
+                    res.suggestions.forEach(function(sugg) {
+                        state.aiSuggestions[sugg.taskId] = sugg;
+                    });
+                    
+                    renderPage(state.currentPage); // Natively draw them via renderInboxBulkRow
+                })
+                .withFailureHandler(function(e) { alert('AI Command Failed: ' + e); })
+                .suggestAlignmentForInbox(taskIds);
+        }
+
+        function suggestInboxAlignment(id) {
+            // Overloaded to process just a single task inline
+            var tasks = getInboxTasks().filter(x => x.id === id);
+            if(!tasks.length) return;
+            
+            showToast('Asking AI...');
+            
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if(!res || !res.success) { 
+                        var err = res && res.error ? res.error : 'Unknown error (No serialized object return)';
+                        alert('AI Error: ' + err); 
+                        return; 
+                    }
+                    
+                    var sugg = res.suggestions[0];
+                    if(!sugg) return;
+                    
+                    if (!state.aiSuggestions) state.aiSuggestions = {};
+                    state.aiSuggestions[sugg.taskId] = sugg;
+                    
+                    renderPage(state.currentPage);
+                })
+                .withFailureHandler(function(e) { alert('AI Command Failed: ' + e); })
+                .suggestAlignmentForInbox([id]);
+        }
+
+        function acceptAIAlignment(taskId) {
+            var sugg = state.aiSuggestions ? state.aiSuggestions[taskId] : null;
+            if(!sugg) {
+                // DOM fallback for safety
+                var dataDiv = document.getElementById('ai-suggestion-data-' + taskId);
+                if (dataDiv) sugg = JSON.parse(dataDiv.innerText);
+                if (!sugg) return;
+            }
+            
+            var task = state.tasks.find(t => t.id === taskId);
+            var title = task ? task.title : 'Item';
+            
+            if (sugg.suggestedAction === 'EXISTING_PROJECT' && sugg.projectId) {
+                var updates = { type: 'task', parentTaskId: sugg.projectId, status: 'next' };
+                requestQueue.enqueue('updateTask', { id: taskId, updates: updates }, null, 'AI Align: ' + title);
+                
+                if (state.aiSuggestions) delete state.aiSuggestions[taskId];
+                showToast('Task routed to project.');
+                renderPage(state.currentPage);
+                
+            } else if (sugg.suggestedAction === 'NEW_PROJECT') {
+                var tempProjectId = 'temp-proj-' + Date.now();
+                var newProjectData = { 
+                    name: sugg.newProjectName, 
+                    type: 'project',
+                    status: 'active',
+                    description: 'Auto-generated via AI from Inbox task',
+                    parentProjectId: sugg.newParentProjectId || ''
+                };
+                
+                // 1. Create the new project optimistically in local state
+                state.projects.push({
+                    id: tempProjectId,
+                    name: sugg.newProjectName,
+                    status: 'active'
+                });
+                requestQueue.enqueue('createProject', newProjectData, tempProjectId, 'AI Create Proj: ' + sugg.newProjectName);
+                
+                // 2. Route the task to the newly created project using tempId resolution
+                var updates = { type: 'task', parentTaskId: tempProjectId, status: 'next' };
+                requestQueue.enqueue('updateTask', { id: taskId, updates: updates }, null, 'AI Align: ' + title);
+                
+                if (state.aiSuggestions) delete state.aiSuggestions[taskId];
+                showToast('New Project created & Task routed.');
+                renderPage(state.currentPage);
+            }
+        }
+
+        function modifyAIAlignment(taskId) {
+            var container = document.getElementById('ai-suggestion-' + taskId);
+            var sugg = state.aiSuggestions ? state.aiSuggestions[taskId] : null;
+            if(!container || !sugg) return;
+            
+            // Build an inline project selector
+            var html = '<div style="flex:1;"><strong>Correct AI Suggestion:</strong> Select the correct project. The AI will learn this rule.</div>';
+            html += '<div style="display:flex; gap:8px; align-items:center;">';
+            html += '<select id="ai-correction-select-' + taskId + '" class="form-control" style="width:200px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            html += '<option value="">Select correct project...</option>';
+            html += '<option value="NEW_PROJECT_ACTION" style="font-weight:bold; color:var(--primary);">+ Create New Project...</option>';
+            state.projects.filter(p => p.status === 'active').forEach(p => {
+                html += '<option value="' + p.id + '">' + esc(p.name) + '</option>';
+            });
+            html += '</select>';
+            html += '<button onclick="event.stopPropagation(); submitAIAlignmentModification(\'' + taskId + '\')" style="background:var(--primary); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">Save & Train AI</button>';
+            html += '<button onclick="event.stopPropagation(); renderPage(state.currentPage);" style="background:transparent; border:none; cursor:pointer;"><span class="material-icons" style="font-size:16px;">close</span></button>';
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+
+        function submitAIAlignmentModification(taskId) {
+            var select = document.getElementById('ai-correction-select-' + taskId);
+            if(!select || !select.value) return;
+            
+            var rightId = select.value;
+            var sugg = state.aiSuggestions ? state.aiSuggestions[taskId] : {};
+            var wrongId = sugg.projectId || 'NEW_PROJECT';
+            
+            var task = state.tasks.find(t => t.id === taskId);
+            var title = task ? task.title : 'Item';
+            
+            if (rightId === 'NEW_PROJECT_ACTION') {
+                var container = document.getElementById('ai-suggestion-' + taskId);
+                
+                var formHtml = '<div style="flex:1;"><strong>Create New Project:</strong> Define its details.</div>';
+                formHtml += '<div style="display:flex; gap:8px; align-items:center;">';
+                formHtml += '<input type="text" id="ai-new-proj-name-' + taskId + '" class="form-control" placeholder="Project Name..." style="width:150px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+                
+                formHtml += '<select id="ai-new-proj-parent-' + taskId + '" class="form-control" style="width:150px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+                formHtml += '<option value="">(No Parent)</option>';
+                state.projects.filter(p => p.status === 'active' && p.type === 'folder').forEach(p => {
+                    formHtml += '<option value="' + p.id + '">📁 ' + esc(p.name) + '</option>';
+                });
+                state.projects.filter(p => p.status === 'active' && p.type === 'project').forEach(p => {
+                    formHtml += '<option value="' + p.id + '">📊 ' + esc(p.name) + '</option>';
+                });
+                formHtml += '</select>';
+                
+                formHtml += '<button onclick="event.stopPropagation(); finalizeAIProjectCreation(\'' + taskId + '\')" style="background:var(--primary); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">Create & Route</button>';
+                formHtml += '<button onclick="event.stopPropagation(); renderPage(state.currentPage);" style="background:transparent; border:none; cursor:pointer;"><span class="material-icons" style="font-size:16px;">close</span></button>';
+                formHtml += '</div>';
+                
+                container.innerHTML = formHtml;
+                return;
+            }
+            
+            // 1. Route the task physically
+            var updates = { type: 'task', parentTaskId: rightId, status: 'next' };
+            requestQueue.enqueue('updateTask', { id: taskId, updates: updates }, null, 'User Route: ' + title);
+            
+            if (state.aiSuggestions) delete state.aiSuggestions[taskId];
+            showToast('Task routed. Training AI...');
+            renderPage(state.currentPage);
+            
+            // 2. Train the AI silently
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) {
+                        console.log('AI Learned rule:', res.newContext);
+                    } else {
+                        console.log('AI failed to learn rule:', res);
+                    }
+                })
+                .learnFromCorrection(taskId, wrongId, rightId);
+        }
+
+        function finalizeAIProjectCreation(taskId) {
+            var nameInput = document.getElementById('ai-new-proj-name-' + taskId);
+            var parentSelect = document.getElementById('ai-new-proj-parent-' + taskId);
+            
+            if (!nameInput || !nameInput.value.trim()) { alert('Project name is required.'); return; }
+            var newName = nameInput.value.trim();
+            var parentId = parentSelect ? parentSelect.value : '';
+            
+            var task = state.tasks.find(t => t.id === taskId);
+            var title = task ? task.title : 'Item';
+            
+            var tempProjectId = 'temp-proj-' + Date.now();
+            var newProjectData = { 
+                name: newName, 
+                type: 'project',
+                status: 'active',
+                description: 'Auto-generated via AI from Inbox task',
+                parentProjectId: parentId
+            };
+            
+            state.projects.push({ id: tempProjectId, name: newName, status: 'active', parentProjectId: parentId });
+            requestQueue.enqueue('createProject', newProjectData, tempProjectId, 'User Create Proj: ' + newName);
+            
+            var updates = { type: 'task', parentTaskId: tempProjectId, status: 'next' };
+            requestQueue.enqueue('updateTask', { id: taskId, updates: updates }, null, 'User Route: ' + title);
+            
+            if (state.aiSuggestions) delete state.aiSuggestions[taskId];
+            showToast('New Project created. Generating AI Context...');
+            renderPage(state.currentPage);
+            
+            // 1. Generate Project Context
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) {
+                        console.log('Generated Initial AI Context for New Project:', res.newContext);
+                        requestQueue.enqueue('updateProject', { id: tempProjectId, updates: { aiContext: res.newContext } }, null, 'AI Init Context');
+                    }
+                })
+                .generateInitialContextForNewProject(taskId, newName);
+                
+            // 2. If parent specified, teach Global Context about this structural move using names!
+            if (parentId) {
+                google.script.run
+                    .withSuccessHandler(function(r) { 
+                        if (r && r.success) {
+                            console.log('AI Learned structural move directly from creation:', r.newContext);
+                            state.settings.GLOBAL_AI_CONTEXT = r.newContext;
+                            showToast('Global AI learned your folder structure!');
+                        }
+                    })
+                    .trainGlobalContextOnProjectMove(tempProjectId, '', parentId, newName);
+            }
+        }
+
         function saveItem() {
             var id = state.currentItem ? state.currentItem.id : null;
             var type = document.getElementById('itemType').value;
@@ -2773,7 +3165,8 @@
                 status: document.getElementById('itemStatus').value,
                 type: type,
                 dueDate: document.getElementById('itemDueDate').value,
-                reviewCadence: document.getElementById('itemCadence').value
+                reviewCadence: document.getElementById('itemCadence').value,
+                aiContext: document.getElementById('itemAIContext').value
             };
 
             // Safety Check for Status Change
@@ -2843,8 +3236,52 @@
 
                 if (type === 'task') {
                     requestQueue.enqueue('updateTask', { id: id, updates: d }, null, 'Update: ' + d.title);
+                    
+                    var oldParentId = state.currentItem.projectId || state.currentItem.parentTaskId || state.currentItem.parentProjectId || '';
+                    if (d.parentTaskId !== oldParentId) {
+                        showToast('Training Project Context...');
+                        google.script.run
+                            .withSuccessHandler(function(r) { 
+                                if (r && r.success) {
+                                    console.log('AI Learned task move:', r.newContext); 
+                                    showToast('AI learned your new routing rule!');
+                                    
+                                    var rightProject = state.projects.find(p => p.id === d.parentTaskId);
+                                    if(rightProject) rightProject.aiContext = r.newContext;
+                                } else {
+                                    console.log('AI failed to learn move', r);
+                                }
+                            })
+                            .withFailureHandler(function(e) { console.error('AI task hook failed:', e);})
+                            .learnFromCorrection(id, oldParentId, d.parentTaskId);
+                    }
                 } else {
                     requestQueue.enqueue('updateProject', { id: id, updates: d }, null, 'Update: ' + (d.name || d.title));
+                    
+                    var oldParentId = state.currentItem.projectId || state.currentItem.parentTaskId || state.currentItem.parentProjectId || '';
+                    if (d.parentProjectId !== oldParentId) {
+                        showToast('Training Global Context...');
+                        google.script.run
+                            .withSuccessHandler(function(r) { 
+                                if (r && r.success) {
+                                    console.log('AI Learned structural move:', r.newContext);
+                                    state.settings.GLOBAL_AI_CONTEXT = r.newContext;
+                                    showToast('AI learned your new structural rule!');
+                                } else {
+                                    console.error('AI structural learning failed:', r);
+                                    if(r && r.reason === 'Moved to root') {
+                                       // Ignore silently
+                                    } else {
+                                       showToast('AI System Error: ' + (r ? r.error || r.reason : 'Unknown'));
+                                    }
+                                }
+                            })
+                            .withFailureHandler(function(e) {
+                                console.error('AI connection error during structural learning:', e);
+                                showToast('AI Connection Error: ' + e);
+                            })
+                            .trainGlobalContextOnProjectMove(id, oldParentId, d.parentProjectId);
+                    }
                 }
             } else {
                 // Create New (Full Dialog)

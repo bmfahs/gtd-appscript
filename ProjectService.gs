@@ -47,7 +47,7 @@ const ProjectService = {
    */
   getProject: function(projectId) {
     const task = TaskService.getTask(projectId);
-    if (task && task.type === TASK_TYPE.PROJECT) {
+    if (task && (task.type === TASK_TYPE.PROJECT || task.type === TASK_TYPE.FOLDER)) {
       return this.taskToProject(task);
     }
     return null;
@@ -94,6 +94,7 @@ const ProjectService = {
     if (updates.type !== undefined) taskUpdates.type = updates.type;
     if (updates.reviewCadence !== undefined) taskUpdates.reviewCadence = updates.reviewCadence;
     if (updates.lastReviewed !== undefined) taskUpdates.lastReviewed = updates.lastReviewed;
+    if (updates.aiContext !== undefined) taskUpdates.aiContext = updates.aiContext;
     
     const result = TaskService.updateTask(projectId, taskUpdates);
     
@@ -195,7 +196,8 @@ const ProjectService = {
       type: task.type || TASK_TYPE.PROJECT,
       scheduledDate: task.scheduledDate,
       reviewCadence: task.reviewCadence,
-      lastReviewed: task.lastReviewed
+      lastReviewed: task.lastReviewed,
+      aiContext: task.aiContext || ''
     };
   }
 };

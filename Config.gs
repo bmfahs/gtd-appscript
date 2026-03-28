@@ -80,7 +80,7 @@ const TASK_COLUMN_ORDER = (function() {
     'EMAIL_THREAD_ID', 'PRIORITY', 'ENERGY_REQUIRED', 'TIME_ESTIMATE',
     'PARENT_TASK_ID', 'SORT_ORDER', 'TYPE', 'AREA_ID',
     'IMPORTANCE', 'URGENCY', 'IS_STARRED',
-    'LAST_REVIEWED', 'REVIEW_CADENCE'
+    'LAST_REVIEWED', 'REVIEW_CADENCE', 'AI_CONTEXT'
   ];
   
   try {
@@ -146,7 +146,8 @@ const AREA_COLS = {
   ID: 0,
   NAME: 1,
   ICON: 2,
-  SORT_ORDER: 3
+  SORT_ORDER: 3,
+  AI_CONTEXT: 4
 };
 
 // Priority algorithm weights

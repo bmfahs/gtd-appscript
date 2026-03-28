@@ -149,10 +149,11 @@ const AreaService = {
       id: generateUUID(),
       name: areaData.name || '',
       icon: areaData.icon || '📁',
-      sortOrder: areaData.sortOrder || this.getNextSortOrder()
+      sortOrder: areaData.sortOrder || this.getNextSortOrder(),
+      aiContext: areaData.aiContext || ''
     };
     
-    const row = [area.id, area.name, area.icon, area.sortOrder];
+    const row = [area.id, area.name, area.icon, area.sortOrder, area.aiContext];
     sheet.appendRow(row);
     
     if (typeof clearDataCache === 'function') clearDataCache();
@@ -170,13 +171,13 @@ const AreaService = {
       return { success: false, error: 'Area not found' };
     }
     
-    const data = sheet.getRange(rowNum, 1, 1, 4).getValues()[0];
+    const data = sheet.getRange(rowNum, 1, 1, 5).getValues()[0];
     const area = this.rowToArea(data);
     
     Object.assign(area, updates);
     
-    const row = [area.id, area.name, area.icon, area.sortOrder];
-    sheet.getRange(rowNum, 1, 1, 4).setValues([row]);
+    const row = [area.id, area.name, area.icon, area.sortOrder, area.aiContext || ''];
+    sheet.getRange(rowNum, 1, 1, 5).setValues([row]);
     
     if (typeof clearDataCache === 'function') clearDataCache();
     return { success: true, area: area };
@@ -215,7 +216,8 @@ const AreaService = {
       id: row[AREA_COLS.ID] || '',
       name: row[AREA_COLS.NAME] || '',
       icon: row[AREA_COLS.ICON] || '📁',
-      sortOrder: row[AREA_COLS.SORT_ORDER] || 0
+      sortOrder: row[AREA_COLS.SORT_ORDER] || 0,
+      aiContext: row[AREA_COLS.AI_CONTEXT] || ''
     };
   }
 };

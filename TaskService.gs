@@ -440,7 +440,8 @@ const TaskService = {
       urgency: row[TASK_COLS.URGENCY] || '',
       isStarred: row[TASK_COLS.IS_STARRED] === true || row[TASK_COLS.IS_STARRED] === 'true',
       lastReviewed: safeFormatDate(row[TASK_COLS.LAST_REVIEWED]),
-      reviewCadence: parseInt(row[TASK_COLS.REVIEW_CADENCE]) || 1 // Default to 1 week if missing/invalid
+      reviewCadence: parseInt(row[TASK_COLS.REVIEW_CADENCE]) || 1, // Default to 1 week if missing/invalid
+      aiContext: row[TASK_COLS.AI_CONTEXT] || ''
     };
   },
   
@@ -490,6 +491,9 @@ const TaskService = {
     row[TASK_COLS.IS_STARRED] = task.isStarred;
     row[TASK_COLS.LAST_REVIEWED] = task.lastReviewed;
     row[TASK_COLS.REVIEW_CADENCE] = task.reviewCadence;
+    if (TASK_COLS.AI_CONTEXT !== undefined) {
+      row[TASK_COLS.AI_CONTEXT] = task.aiContext || '';
+    }
     return row;
   }
 };
