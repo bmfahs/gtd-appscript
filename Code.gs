@@ -444,7 +444,7 @@ function completeTask(taskId) {
  */
 function completeProject(projectId) {
   return TaskService.updateTask(projectId, { 
-    status: STATUS.COMPLETED, 
+    status: PROJECT_STATUS.COMPLETED, 
     completedDate: now() 
   });
 }

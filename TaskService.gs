@@ -101,7 +101,6 @@ const TaskService = {
    * Create a new task
    */
   createTask: function(taskData) {
-    const sheet = getSheet(SHEETS.TASKS);
     const timestamp = now();
     
     const task = {
@@ -142,6 +141,7 @@ const TaskService = {
         return DatabaseService.createTask(task).task;
     }
     
+    const sheet = getSheet(SHEETS.TASKS);
     const row = this.taskToRow(task);
     sheet.appendRow(row);
     
@@ -413,7 +413,10 @@ const TaskService = {
    * Get next sort order value
    */
   getNextSortOrder: function() {
-    // Get max sort order from relevant items? Or global?
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        return DatabaseService.getMaxSortOrder() + 1;
+    }
+
     // Let's use global to avoid collisions if we mix views
     const items = this.getAllItems();
     if (items.length === 0) return 1;

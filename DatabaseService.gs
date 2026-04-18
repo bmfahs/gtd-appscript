@@ -242,6 +242,25 @@ const DatabaseService = {
     }
   },
 
+  getMaxSortOrder: function() {
+    let conn;
+    try {
+      conn = this.getConnection();
+      const stmt = conn.createStatement();
+      const rs = stmt.executeQuery("SELECT MAX(sortOrder) FROM tasks");
+      let maxSort = 0;
+      if (rs.next()) {
+        maxSort = rs.getInt(1);
+      }
+      rs.close();
+      stmt.close();
+      return maxSort;
+    } catch (e) {
+      Logger.log("getMaxSortOrder SQL Error: " + e.message);
+      return 0;
+    }
+  },
+
   createTask: function(task) {
     try {
       const conn = this.getConnection();
@@ -266,18 +285,24 @@ const DatabaseService = {
       stmt.setString(11, task.modifiedDate || "");
       stmt.setString(12, task.emailId || "");
       stmt.setString(13, task.emailThreadId || "");
-      stmt.setInt(14, task.priority || 0);
+      stmt.setInt(14, Math.round(task.priority || 0));
       stmt.setString(15, task.energyRequired || "medium");
-      stmt.setString(16, task.timeEstimate || "");
+      stmt.setString(16, String(task.timeEstimate || ""));
       stmt.setString(17, task.parentTaskId || "");
-      stmt.setInt(18, task.sortOrder || 0);
+      stmt.setInt(18, Math.round(task.sortOrder || 0));
       stmt.setString(19, task.type || "task");
       stmt.setString(20, task.areaId || "");
-      stmt.setString(21, task.importance || "");
-      stmt.setString(22, task.urgency || "");
-      stmt.setBoolean(23, task.isStarred || false);
+      stmt.setString(21, String(task.importance || ""));
+      stmt.setString(22, String(task.urgency || ""));
+      
+      if (typeof task.isStarred === 'boolean') {
+          stmt.setBoolean(23, task.isStarred);
+      } else {
+          stmt.setBoolean(23, task.isStarred === 'true' || task.isStarred === true);
+      }
+      
       stmt.setString(24, task.lastReviewed || "");
-      stmt.setInt(25, task.reviewCadence || 1);
+      stmt.setInt(25, Math.round(task.reviewCadence || 1));
       stmt.setString(26, task.aiContext || "");
       
       stmt.executeUpdate();
@@ -310,7 +335,7 @@ const DatabaseService = {
           title=?, notes=?, status=?, contextId=?, waitingFor=?, dueDate=?, scheduledDate=?,
           completedDate=?, modifiedDate=?, priority=?, energyRequired=?, timeEstimate=?,
           parentTaskId=?, sortOrder=?, areaId=?, importance=?, urgency=?, isStarred=?,
-          lastReviewed=?, reviewCadence=?, aiContext=?
+          lastReviewed=?, reviewCadence=?, aiContext=?, type=?
         WHERE id=?
       `);
       
@@ -325,12 +350,12 @@ const DatabaseService = {
       stmt.setString(9, merged.modifiedDate || "");
       stmt.setInt(10, Math.round(merged.priority || 0));
       stmt.setString(11, merged.energyRequired || "medium");
-      stmt.setString(12, merged.timeEstimate || "");
+      stmt.setString(12, String(merged.timeEstimate || ""));
       stmt.setString(13, merged.parentTaskId || "");
       stmt.setInt(14, Math.round(merged.sortOrder || 0));
       stmt.setString(15, merged.areaId || "");
-      stmt.setString(16, merged.importance || "");
-      stmt.setString(17, merged.urgency || "");
+      stmt.setString(16, String(merged.importance || ""));
+      stmt.setString(17, String(merged.urgency || ""));
       if (typeof merged.isStarred === 'boolean') {
           stmt.setBoolean(18, merged.isStarred);
       } else {
@@ -339,7 +364,8 @@ const DatabaseService = {
       stmt.setString(19, merged.lastReviewed || "");
       stmt.setInt(20, Math.round(merged.reviewCadence || 1));
       stmt.setString(21, merged.aiContext || "");
-      stmt.setString(22, taskId);
+      stmt.setString(22, merged.type || "task");
+      stmt.setString(23, taskId);
       
       stmt.executeUpdate();
       stmt.close();
@@ -410,7 +436,7 @@ const DatabaseService = {
           title=?, notes=?, status=?, contextId=?, waitingFor=?, dueDate=?, scheduledDate=?,
           completedDate=?, modifiedDate=?, priority=?, energyRequired=?, timeEstimate=?,
           parentTaskId=?, sortOrder=?, areaId=?, importance=?, urgency=?, isStarred=?,
-          lastReviewed=?, reviewCadence=?, aiContext=?
+          lastReviewed=?, reviewCadence=?, aiContext=?, type=?
         WHERE id=?
       `);
       
@@ -427,12 +453,12 @@ const DatabaseService = {
           stmt.setString(9, merged.modifiedDate || "");
           stmt.setInt(10, Math.round(merged.priority || 0));
           stmt.setString(11, merged.energyRequired || "medium");
-          stmt.setString(12, merged.timeEstimate || "");
+          stmt.setString(12, String(merged.timeEstimate || ""));
           stmt.setString(13, merged.parentTaskId || "");
           stmt.setInt(14, Math.round(merged.sortOrder || 0));
           stmt.setString(15, merged.areaId || "");
-          stmt.setString(16, merged.importance || "");
-          stmt.setString(17, merged.urgency || "");
+          stmt.setString(16, String(merged.importance || ""));
+          stmt.setString(17, String(merged.urgency || ""));
           // JDBC boolean safety fallback
           if (typeof merged.isStarred === 'boolean') {
               stmt.setBoolean(18, merged.isStarred);
@@ -442,7 +468,8 @@ const DatabaseService = {
           stmt.setString(19, merged.lastReviewed || "");
           stmt.setInt(20, Math.round(merged.reviewCadence || 1));
           stmt.setString(21, merged.aiContext || "");
-          stmt.setString(22, v.id);
+          stmt.setString(22, merged.type || "task");
+          stmt.setString(23, v.id);
           stmt.addBatch();
       });
       
