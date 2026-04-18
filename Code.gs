@@ -430,40 +430,23 @@ function updateTasks(updatesArray) {
  * Complete a task
  */
 function completeTask(taskId) {
-  var task = TaskService.getTask(taskId);
-  if (!task) return { success: false, error: 'Task not found' };
-  
   var updates = {
     status: STATUS.DONE,
     completedDate: now()
   };
   
-  var result = TaskService.updateTask(taskId, updates);
-  if (result.success) {
-    return { success: true, task: TaskService.getTask(taskId) };
-  } else {
-    return result;
-  }
+  // DatabaseService.updateTask already handles validation and returns the final object.
+  return TaskService.updateTask(taskId, updates);
 }
 
 /**
  * Complete a project
  */
 function completeProject(projectId) {
-  var project = ProjectService.getProject(projectId);
-  if (!project) return { success: false, error: 'Project not found' };
-  
-  var updates = {
-    status: 'completed',
-    completedDate: now()
-  };
-  
-  var result = ProjectService.updateProject(projectId, updates);
-  if (result.success) {
-    return { success: true, project: ProjectService.getProject(projectId) };
-  } else {
-    return result;
-  }
+  return TaskService.updateTask(projectId, { 
+    status: STATUS.COMPLETED, 
+    completedDate: now() 
+  });
 }
 
 /**

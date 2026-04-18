@@ -6,6 +6,7 @@
 const DatabaseService = {
   
   _cachedConn: null,
+  _settingsCache: null,
   
   getConnection: function() {
     if (this._cachedConn && !this._cachedConn.isClosed()) {
@@ -220,6 +221,27 @@ const DatabaseService = {
     }
   },
 
+  hasActiveChildren: function(parentId) {
+    let conn;
+    try {
+      conn = this.getConnection();
+      const stmt = conn.prepareStatement("SELECT COUNT(*) FROM tasks WHERE parentTaskId = ? AND status != 'completed' AND status != 'done' AND status != 'dropped' AND status != 'deleted'");
+      stmt.setString(1, parentId);
+      const rs = stmt.executeQuery();
+      
+      let hasActive = false;
+      if (rs.next()) {
+        hasActive = rs.getInt(1) > 0;
+      }
+      rs.close();
+      stmt.close();
+      return hasActive;
+    } catch (e) {
+      Logger.log("hasActiveChildren SQL Error: " + e.message);
+      return false; // Fail open to allow operation if DB acts up
+    }
+  },
+
   createTask: function(task) {
     try {
       const conn = this.getConnection();
@@ -292,33 +314,40 @@ const DatabaseService = {
         WHERE id=?
       `);
       
-      stmt.setString(1, merged.title);
-      stmt.setString(2, merged.notes);
-      stmt.setString(3, merged.status);
-      stmt.setString(4, merged.contextId);
-      stmt.setString(5, merged.waitingFor);
-      stmt.setString(6, merged.dueDate);
-      stmt.setString(7, merged.scheduledDate);
-      stmt.setString(8, merged.completedDate);
-      stmt.setString(9, merged.modifiedDate);
-      stmt.setInt(10, merged.priority);
-      stmt.setString(11, merged.energyRequired);
-      stmt.setString(12, merged.timeEstimate);
-      stmt.setString(13, merged.parentTaskId);
-      stmt.setInt(14, merged.sortOrder);
-      stmt.setString(15, merged.areaId);
-      stmt.setString(16, merged.importance);
-      stmt.setString(17, merged.urgency);
-      stmt.setBoolean(18, merged.isStarred);
-      stmt.setString(19, merged.lastReviewed);
-      stmt.setInt(20, merged.reviewCadence);
-      stmt.setString(21, merged.aiContext);
+      stmt.setString(1, merged.title || "");
+      stmt.setString(2, merged.notes || "");
+      stmt.setString(3, merged.status || "inbox");
+      stmt.setString(4, merged.contextId || "");
+      stmt.setString(5, merged.waitingFor || "");
+      stmt.setString(6, merged.dueDate || "");
+      stmt.setString(7, merged.scheduledDate || "");
+      stmt.setString(8, merged.completedDate || "");
+      stmt.setString(9, merged.modifiedDate || "");
+      stmt.setInt(10, Math.round(merged.priority || 0));
+      stmt.setString(11, merged.energyRequired || "medium");
+      stmt.setString(12, merged.timeEstimate || "");
+      stmt.setString(13, merged.parentTaskId || "");
+      stmt.setInt(14, Math.round(merged.sortOrder || 0));
+      stmt.setString(15, merged.areaId || "");
+      stmt.setString(16, merged.importance || "");
+      stmt.setString(17, merged.urgency || "");
+      if (typeof merged.isStarred === 'boolean') {
+          stmt.setBoolean(18, merged.isStarred);
+      } else {
+          stmt.setBoolean(18, merged.isStarred === 'true' || merged.isStarred === true);
+      }
+      stmt.setString(19, merged.lastReviewed || "");
+      stmt.setInt(20, Math.round(merged.reviewCadence || 1));
+      stmt.setString(21, merged.aiContext || "");
       stmt.setString(22, taskId);
       
       stmt.executeUpdate();
       stmt.close();
       if (typeof clearDataCache === 'function') clearDataCache();
-      return { success: true, task: this.getTask(taskId) };
+      
+      // Optimization: No need to perform another SELECT round-tip here.
+      // merged contains the truth we just wrote. Return it directly.
+      return { success: true, task: merged }; 
     } catch (e) {
       Logger.log("updateTask SQL Error: " + e.message);
       return { success: false, error: e.message };
@@ -396,11 +425,11 @@ const DatabaseService = {
           stmt.setString(7, merged.scheduledDate || "");
           stmt.setString(8, merged.completedDate || "");
           stmt.setString(9, merged.modifiedDate || "");
-          stmt.setInt(10, merged.priority || 0);
+          stmt.setInt(10, Math.round(merged.priority || 0));
           stmt.setString(11, merged.energyRequired || "medium");
           stmt.setString(12, merged.timeEstimate || "");
           stmt.setString(13, merged.parentTaskId || "");
-          stmt.setInt(14, merged.sortOrder || 0);
+          stmt.setInt(14, Math.round(merged.sortOrder || 0));
           stmt.setString(15, merged.areaId || "");
           stmt.setString(16, merged.importance || "");
           stmt.setString(17, merged.urgency || "");
@@ -411,7 +440,7 @@ const DatabaseService = {
               stmt.setBoolean(18, merged.isStarred === 'true' || merged.isStarred === true);
           }
           stmt.setString(19, merged.lastReviewed || "");
-          stmt.setInt(20, merged.reviewCadence || 1);
+          stmt.setInt(20, Math.round(merged.reviewCadence || 1));
           stmt.setString(21, merged.aiContext || "");
           stmt.setString(22, v.id);
           stmt.addBatch();
@@ -637,7 +666,22 @@ const DatabaseService = {
   },
 
   getSettings: function() {
-    let conn; try { conn = this.getConnection(); const rs = conn.createStatement().executeQuery("SELECT * FROM settings"); const settings = {}; while(rs.next()) { settings[rs.getString("config_key")] = rs.getString("config_value"); } rs.close(); return settings; } catch(e) { return {}; }
+    if (this._settingsCache) return this._settingsCache;
+    
+    let conn; 
+    try { 
+        conn = this.getConnection(); 
+        const rs = conn.createStatement().executeQuery("SELECT * FROM settings"); 
+        const settings = {}; 
+        while(rs.next()) { 
+            settings[rs.getString("config_key")] = rs.getString("config_value"); 
+        } 
+        rs.close(); 
+        this._settingsCache = settings; // Memoize for this execution
+        return settings; 
+    } catch(e) { 
+        return {}; 
+    }
   },
 
   updateSetting: function(key, value) {

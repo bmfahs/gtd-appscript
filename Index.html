@@ -3512,13 +3512,12 @@
             // Build an inline project selector
             var html = '<div style="flex:1;"><strong>Correct AI Suggestion:</strong> Select the correct project. The AI will learn this rule.</div>';
             html += '<div style="display:flex; gap:8px; align-items:center;">';
-            html += '<select id="ai-correction-select-' + taskId + '" class="form-control" style="width:200px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
-            html += '<option value="">Select correct project...</option>';
-            html += '<option value="NEW_PROJECT_ACTION" style="font-weight:bold; color:var(--primary);">+ Create New Project...</option>';
+            html += '<input list="ai-proj-datalist-' + taskId + '" id="ai-correction-display-' + taskId + '" class="form-control" placeholder="Search or Type Project..." style="width:250px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+            html += '<datalist id="ai-proj-datalist-' + taskId + '">';
             state.projects.filter(p => p.status === 'active').forEach(p => {
-                html += '<option value="' + p.id + '">' + esc(p.name) + '</option>';
+                html += '<option value="' + esc(p.name) + '"></option>';
             });
-            html += '</select>';
+            html += '</datalist>';
             html += '<button onclick="event.stopPropagation(); submitAIAlignmentModification(\'' + taskId + '\')" style="background:var(--primary); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">Save & Train AI</button>';
             html += '<button onclick="event.stopPropagation(); renderPage(state.currentPage);" style="background:transparent; border:none; cursor:pointer;"><span class="material-icons" style="font-size:16px;">close</span></button>';
             html += '</div>';
@@ -3527,10 +3526,14 @@
         }
 
         function submitAIAlignmentModification(taskId) {
-            var select = document.getElementById('ai-correction-select-' + taskId);
-            if(!select || !select.value) return;
+            var display = document.getElementById('ai-correction-display-' + taskId);
+            if(!display || !display.value.trim()) return;
             
-            var rightId = select.value;
+            var typedName = display.value.trim();
+            var existingProject = state.projects.find(p => p.status === 'active' && p.name.toLowerCase() === typedName.toLowerCase());
+            
+            var rightId = existingProject ? existingProject.id : 'NEW_PROJECT_ACTION';
+            
             var sugg = state.aiSuggestions ? state.aiSuggestions[taskId] : {};
             var wrongId = sugg.projectId || 'NEW_PROJECT';
             
@@ -3540,9 +3543,9 @@
             if (rightId === 'NEW_PROJECT_ACTION') {
                 var container = document.getElementById('ai-suggestion-' + taskId);
                 
-                var formHtml = '<div style="flex:1;"><strong>Create New Project:</strong> Define its details.</div>';
+                var formHtml = '<div style="flex:1;"><strong>Create New Project:</strong> No matching project found. Define details:</div>';
                 formHtml += '<div style="display:flex; gap:8px; align-items:center;">';
-                formHtml += '<input type="text" id="ai-new-proj-name-' + taskId + '" class="form-control" placeholder="Project Name..." style="width:150px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
+                formHtml += '<input type="text" id="ai-new-proj-name-' + taskId + '" value="' + esc(typedName) + '" class="form-control" placeholder="Project Name..." style="width:150px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
                 
                 formHtml += '<select id="ai-new-proj-parent-' + taskId + '" class="form-control" style="width:150px; padding:4px; font-size:12px;" onclick="event.stopPropagation()">';
                 formHtml += '<option value="">(No Parent)</option>';
@@ -4666,7 +4669,8 @@
                         req.error = result;
                         req.retryCount++;
 
-                        showToast('Sync Error: ' + result);
+                        var errMsg = (typeof result === 'object') ? JSON.stringify(result) : result;
+                        showToast('Sync Error: ' + errMsg);
                         this.queue.shift(); // Drop it for now to unblock
                         this.renderUI();
                     } // End if(success)

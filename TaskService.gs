@@ -236,6 +236,9 @@ const TaskService = {
    * Check if item has active children
    */
   hasActiveChildren: function(parentId) {
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        return DatabaseService.hasActiveChildren(parentId);
+    }
     const children = this.getAllItems().filter(t => t.parentTaskId === parentId);
     // Active children are those NOT done AND NOT deleted AND NOT dropped
     const activeChildren = children.filter(t => 
