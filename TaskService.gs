@@ -12,6 +12,10 @@ const TaskService = {
    * Get all items (tasks and projects)
    */
   getAllItems: function() {
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        return DatabaseService.getAllItems();
+    }
+    
     var sheet = getSheet(SHEETS.TASKS);
     if (!sheet) {
       Logger.log('Tasks sheet not found!');
@@ -77,6 +81,10 @@ const TaskService = {
    * Get a single task by ID
    */
   getTask: function(taskId) {
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        return DatabaseService.getTask(taskId);
+    }
+    
     const sheet = getSheet(SHEETS.TASKS);
     const data = sheet.getDataRange().getValues();
     
@@ -130,6 +138,10 @@ const TaskService = {
         task.priority = PriorityService.calculatePriority(task);
     }
     
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        return DatabaseService.createTask(task).task;
+    }
+    
     const row = this.taskToRow(task);
     sheet.appendRow(row);
     
@@ -152,6 +164,10 @@ const TaskService = {
         if (this.hasActiveChildren(taskId)) {
             return { success: false, error: 'Cannot complete/delete item with active children' };
         }
+    }
+    
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        return DatabaseService.updateTask(taskId, updates);
     }
 
     // Need to handle variable column length if schema updated but data not migrated fully?
@@ -244,6 +260,10 @@ const TaskService = {
    * Permanently delete a task
    */
   hardDeleteTask: function(taskId) {
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        return DatabaseService.hardDeleteTask(taskId);
+    }
+    
     const sheet = getSheet(SHEETS.TASKS);
     const rowNum = findRowById(sheet, taskId, TASK_COLS.ID);
     

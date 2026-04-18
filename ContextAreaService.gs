@@ -9,6 +9,8 @@ const ContextService = {
    * Get all contexts
    */
   getAllContexts: function() {
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) return DatabaseService.getAllContexts();
+    
     const sheet = getSheet(SHEETS.CONTEXTS);
     const data = sheet.getDataRange().getValues();
     const contexts = [];
@@ -24,6 +26,8 @@ const ContextService = {
    * Get a single context by ID
    */
   getContext: function(contextId) {
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) return DatabaseService.getTaskContext(contextId);
+
     const contexts = this.getAllContexts();
     return contexts.find(c => c.id === contextId) || null;
   },
@@ -32,6 +36,11 @@ const ContextService = {
    * Create a new context
    */
   createContext: function(contextData) {
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        if (typeof clearDataCache === 'function') clearDataCache();
+        return DatabaseService.createContext(contextData);
+    }
+
     const sheet = getSheet(SHEETS.CONTEXTS);
     
     const context = {
@@ -52,6 +61,11 @@ const ContextService = {
    * Update a context
    */
   updateContext: function(contextId, updates) {
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        if (typeof clearDataCache === 'function') clearDataCache();
+        return DatabaseService.updateContext(contextId, updates);
+    }
+
     const sheet = getSheet(SHEETS.CONTEXTS);
     const rowNum = findRowById(sheet, contextId, CONTEXT_COLS.ID);
     
@@ -75,6 +89,11 @@ const ContextService = {
    * Delete a context
    */
   deleteContext: function(contextId) {
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        if (typeof clearDataCache === 'function') clearDataCache();
+        return DatabaseService.deleteContext(contextId);
+    }
+
     const sheet = getSheet(SHEETS.CONTEXTS);
     const rowNum = findRowById(sheet, contextId, CONTEXT_COLS.ID);
     
@@ -120,6 +139,8 @@ const AreaService = {
    * Get all areas
    */
   getAllAreas: function() {
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) return DatabaseService.getAllAreas();
+
     const sheet = getSheet(SHEETS.AREAS);
     const data = sheet.getDataRange().getValues();
     const areas = [];
@@ -135,6 +156,8 @@ const AreaService = {
    * Get a single area by ID
    */
   getArea: function(areaId) {
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) return DatabaseService.getArea(areaId);
+
     const areas = this.getAllAreas();
     return areas.find(a => a.id === areaId) || null;
   },
@@ -143,6 +166,11 @@ const AreaService = {
    * Create a new area
    */
   createArea: function(areaData) {
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        if (typeof clearDataCache === 'function') clearDataCache();
+        return DatabaseService.createArea(areaData);
+    }
+
     const sheet = getSheet(SHEETS.AREAS);
     
     const area = {
@@ -164,6 +192,11 @@ const AreaService = {
    * Update an area
    */
   updateArea: function(areaId, updates) {
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        if (typeof clearDataCache === 'function') clearDataCache();
+        return DatabaseService.updateArea(areaId, updates);
+    }
+
     const sheet = getSheet(SHEETS.AREAS);
     const rowNum = findRowById(sheet, areaId, AREA_COLS.ID);
     
@@ -187,6 +220,11 @@ const AreaService = {
    * Delete an area
    */
   deleteArea: function(areaId) {
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        if (typeof clearDataCache === 'function') clearDataCache();
+        return DatabaseService.deleteArea(areaId);
+    }
+
     const sheet = getSheet(SHEETS.AREAS);
     const rowNum = findRowById(sheet, areaId, AREA_COLS.ID);
     

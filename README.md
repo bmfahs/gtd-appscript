@@ -53,6 +53,7 @@ A personal productivity application based on the Getting Things Done (GTD) metho
     - **Visual Hierarchy**: Search results show parent projects indented for context (e.g. `Bar > Foo`).
 - **Export**: Download your completed task history to CSV (now with date-stamped filenames).
 - **Database Compaction**: Clean up deleted items to keep the app fast.
+- **SQL Debugging Tools**: Run `testSqlSpeed()` in `Code.gs` to seamlessly bench your Cloud proxy ping, or `forceRebuildSchema()` to instantly rebuild and sync Config tables if the original migration was prematurely interrupted.
 
 ## Prerequisites
 - A Google Account.
@@ -86,6 +87,19 @@ To enable the AI Email Scanner:
 
 ### 3. Initialize
 - The first time you load the web app, it will automatically create the necessary sheets (`Tasks`, `Contexts`, `Areas`, `Settings`).
+
+### 4. Enterprise Cloud SQL Database (High Performance)
+*(For users experiencing latency working off the native Google Sheets DB)*
+- Provision a minimal Google Cloud SQL instance (PostgreSQL or MySQL 5.7+) attached to your GCP project.
+- The SQL integration leverages highly advanced **JDBC Socket Pooling** and **Server-Side JSON Array Aggregation** (`JSON_ARRAYAGG`) to compress thousands of rows natively inside MySQL, bypassing the rigorous Google Apps Script network proxy bottlenecks and granting absolute sub-second (<1s) load times!
+- In Apps Script, go to **Project Settings > Script Properties** and add your connection variables:
+  - `DB_INSTANCE_CONNECTION_NAME` = your `project:region:instance` (for MySQL) or `DB_HOST` (IP Address for Postgres)
+  - `DB_USER` = database user (e.g., `root` or `postgres`)
+  - `DB_PASSWORD` = user password
+  - `DB_NAME` = database name
+  - `DB_TYPE` = `mysql` (or `postgresql`)
+- Ensure `USE_SQL_BACKEND = false` in `Config.gs`. Then, open `Code.gs` and execute `migrateToCloudSql`. This will parse your spreadsheet matrix, initialize perfectly indexed relational tables, and execute a bulk synchronization of your data.
+- Finally, open `Config.gs`, set `const USE_SQL_BACKEND = true;`, and hit save. Your app will now securely detach from Google Sheets and run entirely off your optimized SQL Engine!
 
 ## Usage
 

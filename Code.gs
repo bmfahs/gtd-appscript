@@ -200,6 +200,16 @@ function getAllData(forceRefresh) {
         }
     }
 
+    // Optimization: If SQL Backend is active, grab everything in ONE single database connection
+    // to avoid the 3-5 second handshake penalty per individual service query.
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        const payload = DatabaseService.getAllDataPayload();
+        const sanitizedSql = JSON.parse(JSON.stringify(payload));
+        // Cache it too
+        try { cache.put('gtd_all_data', JSON.stringify(sanitizedSql), 21600); } catch(e){}
+        return sanitizedSql;
+    }
+
     // Optimization: Read Tasks sheet once for both Tasks and Projects
     // And filter out 'done' items to reduce payload size
     const allItems = TaskService.getAllItems();
@@ -250,6 +260,10 @@ function getAllData(forceRefresh) {
     
     // If sheets don't exist, initialize first
     try {
+      if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+         Logger.log('SQL Backend active. Ignoring fallback initialization.');
+         throw new Error("Critical fallback skipped because SQL is active. Database schema must be migrated manually.");
+      }
       Logger.log('Attempting to initialize system...');
       initializeSystem();
       // On init, empty is fine
@@ -273,6 +287,8 @@ function getAllData(forceRefresh) {
  * Get settings
  */
 function getSettings() {
+  if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) return DatabaseService.getSettings();
+
   const sheet = getSheet(SHEETS.SETTINGS);
   const data = sheet.getDataRange().getValues();
   const settings = {};
@@ -291,6 +307,11 @@ function getSettings() {
  * Update a setting
  */
 function updateSetting(key, value) {
+  if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+      if (typeof clearDataCache === 'function') clearDataCache();
+      return DatabaseService.updateSetting(key, value);
+  }
+
   const sheet = getSheet(SHEETS.SETTINGS);
   const data = sheet.getDataRange().getValues();
   
@@ -646,6 +667,10 @@ function exportCompletedItems() {
  * Compact the database by removing completed/deleted items
  */
 function compactDatabase() {
+  if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+    return DatabaseService.compactDatabase();
+  }
+
   var result = {
     tasksRemoved: 0,
     projectsRemoved: 0
@@ -869,4 +894,93 @@ function synthesizeAllContexts(startIndex) {
 
 function getSynthesisProgress() {
   return AIAgentService.getSynthesisProgress();
+}
+
+/**
+ * Enterprise Database Migration Route
+ */
+function migrateToCloudSql() {
+  return DatabaseService.migrateFromSheetsToSql();
+}
+
+/**
+ * Executes a nightly database backup to a JSON file in Google Drive.
+ * This should be scheduled by a time-driven trigger.
+ */
+function executeNightlyBackup() {
+  return BackupService.runNightlyBackup();
+}
+
+/**
+ * One-time setup utility to programmatically register the nightly backup trigger.
+ * Run this function manually from the Apps Script editor.
+ */
+function setupBackupTrigger() {
+  return BackupService.setupTrigger();
+}
+
+/**
+ * Diagnostic tool to bench SQL latency and expose hidden timeout errors
+ * Run this directly from the backend editor to instantly see why it is hanging!
+ */
+function testSqlSpeed() {
+  Logger.log("Starting SQL Speed Test...");
+  const start = Date.now();
+  
+  if (typeof USE_SQL_BACKEND === 'undefined' || !USE_SQL_BACKEND) {
+    Logger.log("ABORT: USE_SQL_BACKEND is set to false in Config.gs!");
+    return;
+  }
+  
+  try {
+    Logger.log("1. Connecting to Cloud SQL Proxy...");
+    const connStart = Date.now();
+    const conn = DatabaseService.getConnection();
+    Logger.log(`-> Connection established in ${Date.now() - connStart}ms!`);
+    
+    Logger.log("2. Testing Unified Payload method...");
+    
+    // Clear out any frontend payload cache from when it was repeatedly failing, to force the UI to fetch!
+    try { CacheService.getUserCache().remove('gtd_all_data'); } catch(e){}
+    const payloadStart = Date.now();
+    const payload = DatabaseService.getAllDataPayload();
+    Logger.log(`-> Payload fetched in ${Date.now() - payloadStart}ms!`);
+    
+    Logger.log(`Total tasks found: ${payload.tasks ? payload.tasks.length : 'undefined/error'}`);
+    Logger.log(`Total settings found: ${payload.settings ? Object.keys(payload.settings).length : 'undefined/error'}`);
+    
+    Logger.log(`SUCCESS! Total Execution Time: ${Date.now() - start}ms`);
+    return payload;
+  } catch (e) {
+    Logger.log(`FATAL ERROR AFTER ${Date.now() - start}ms: ` + e.toString());
+    throw e;
+  }
+}
+
+/**
+ * Utility to instantly fix missing tables ("Table 'gtd.settings' doesn't exist")
+ * without needing to rerun the entire Sheet Migration process.
+ */
+function forceRebuildSchema() {
+  const result = DatabaseService.initSchema();
+  if (result.success) {
+    Logger.log("SUCCESS! All tables built.");
+    try {
+        const allSettings = getSettings();
+        const conn = DatabaseService.getConnection();
+        const setStmt = conn.prepareStatement(`INSERT INTO settings (config_key, config_value) VALUES (?, ?)`);
+        Object.keys(allSettings).forEach(key => {
+          setStmt.setString(1, key);
+          setStmt.setString(2, allSettings[key]);
+          setStmt.addBatch();
+        });
+        if (Object.keys(allSettings).length > 0) setStmt.executeBatch();
+        setStmt.close();
+        Logger.log("Settings successfully populated from legacy Config/Sheets.");
+    } catch(e) {
+        Logger.log("Error migrating local settings: " + e.message);
+    }
+  } else {
+    Logger.log("FAILED to build schema: " + result.error);
+  }
 }

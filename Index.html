@@ -2604,10 +2604,35 @@
             h += '<button class="btn btn-danger" onclick="compactDatabaseClick()">Compact Database</button>';
             h += '<button class="btn btn-warning" onclick="runIntegrityCheckClick()" style="background:var(--warning); color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:500; cursor:pointer;">Run DB Integrity Check</button>';
             h += '<button class="btn" onclick="synthesizeContextsClick()" style="background:var(--primary); color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:500; cursor:pointer;"><span class="material-icons" style="font-size:16px; vertical-align:-3px; margin-right:4px;">psychology</span>Synthesize AI Brain</button>';
+            h += '<button class="btn" id="btnSqlMigrate" onclick="triggerCloudSqlMigrate()" style="background:var(--primary); color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:500; cursor:pointer; width:100%; margin-top:8px;"><span class="material-icons" style="font-size:16px; vertical-align:-3px; margin-right:4px;">storage</span>Migrate Database to Cloud SQL JDBC</button>';
             h += '</div>' + integrityResultsHtml + '</div>';
             return h;
         }
         
+        function triggerCloudSqlMigrate() {
+            var btn = document.getElementById('btnSqlMigrate');
+            if(btn) btn.innerHTML = '<span class="material-icons" style="font-size:16px; margin-right:4px; vertical-align:-3px; animation:spin 2s linear infinite;">sync</span> Porting Database...';
+            state.integrityResults = '<div style="color:var(--text-muted); font-size:13px; margin-top:8px;">Executing batch SQL insertions. This may take a minute depending on historical size...</div>';
+            renderPage('review');
+            
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) {
+                        state.integrityResults = '<div style="color:var(--text-success); font-size:13px; font-weight:500;">' + res.message + '</div>';
+                    } else {
+                        state.integrityResults = '<div style="color:var(--text-danger); font-size:13px; font-weight:500;">Migration Failed: ' + (res ? res.error : "Unknown backend SQL error") + '</div>';
+                    }
+                    if(btn) btn.innerHTML = '<span class="material-icons" style="font-size:16px; margin-right:4px; vertical-align:-3px;">storage</span>Migrate Database to Cloud SQL JDBC';
+                    renderPage('review');
+                })
+                .withFailureHandler(function(err) {
+                    state.integrityResults = '<div style="color:var(--text-danger); font-size:13px; font-weight:500;">Critical execution error: ' + err.message + '</div>';
+                    if(btn) btn.innerHTML = '<span class="material-icons" style="font-size:16px; margin-right:4px; vertical-align:-3px;">storage</span>Migrate Database to Cloud SQL JDBC';
+                    renderPage('review');
+                })
+                .migrateToCloudSql();
+        }
+
         function runIntegrityCheckClick() {
             state.integrityResults = '<div style="color:var(--text-muted); font-size:13px; margin-top:8px;">Running database scan...</div>';
             renderPage('review');

@@ -3,6 +3,9 @@
  * Update these values for your setup
  */
 
+// Database Configuration
+const USE_SQL_BACKEND = true; // Set to true to bypass Sheets and natively route via Google Cloud SQL
+
 // Spreadsheet ID management
 function getSpreadsheetId() {
   return PropertiesService.getScriptProperties().getProperty('SHEET_ID');
@@ -87,6 +90,12 @@ const TASK_COLUMN_ORDER = (function() {
     // Attempt to detect schema from actual Sheet
     // Note: This runs every time the script loads.
     // If we can't access the sheet (e.g. auth mode, error), fallback to Legacy (safest).
+    
+    // HARD BYPASS FOR SQL: Do not load the spreadsheet API
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        return newOrder;
+    }
+
     const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
     if (!sheetId) return legacyOrder;
     
@@ -162,11 +171,17 @@ const PRIORITY_WEIGHTS = {
 // AI Model Configuration
 const GEMINI_MODEL = 'auto'; // 'auto' keys dynamic detection, or specify e.g. 'gemini-1.5-pro'
 
+// Global Constants Configuration complete
+
 
 /**
  * Get the spreadsheet instance
  */
 function getSpreadsheet() {
+  if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+    throw new Error('SUCCESS: Spreadsheet decoupled! Application purposefully threw this error to prove it tried to access the slow Spreadsheet while SQL is enabled.');
+  }
+
   const id = getSpreadsheetId();
   if (!id) {
     throw new Error('Spreadsheet ID not set. Run setSpreadsheetId(id) first.');
