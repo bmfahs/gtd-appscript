@@ -157,13 +157,15 @@ const AIService = {
       const data = JSON.parse(response.getContentText());
       if (!data.models) return null;
       
-      // Preferred models in order
+      // Aggressively favor the latest Pro and experimental models first
       const preferences = [
+        'gemini-2.5-pro',
+        'gemini-2.0-pro-exp',
+        'gemini-2.0-pro',
+        'gemini-1.5-pro-latest',
+        'gemini-2.5-flash',
         'gemini-2.0-flash',
-        'gemini-1.5-flash',
-        'gemini-1.5-pro',
-        'gemini-1.0-pro',
-        'gemini-pro'
+        'gemini-1.5-flash-latest'
       ];
       
       // Find the first preferred model that exists in the available list
@@ -181,13 +183,19 @@ const AIService = {
         }
       }
       
-      // Fallback: take any model with 'flash' in the name
+      // Fallback: take any model with 'pro' or 'flash' in the name
       if (!selectedModel) {
-        const flashModel = data.models.find(m => 
-          m.name.includes('flash') && 
+        let fallbackModel = data.models.find(m => 
+          m.name.includes('pro') && 
           m.supportedGenerationMethods.includes('generateContent')
         );
-        if (flashModel) selectedModel = flashModel.name;
+        if (!fallbackModel) {
+            fallbackModel = data.models.find(m => 
+              m.name.includes('flash') && 
+              m.supportedGenerationMethods.includes('generateContent')
+            );
+        }
+        if (fallbackModel) selectedModel = fallbackModel.name;
       }
       
       if (selectedModel) {

@@ -392,6 +392,17 @@ function updateTask(taskId, updates) {
  * Batch update tasks
  */
 function updateTasks(updatesArray) {
+  var start = new Date().getTime();
+  
+  // Ultra-Fast SQL Batch interceptor bypasses sequential 300ms proxy loops
+  if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND && typeof DatabaseService.updateTasksBatch === 'function') {
+      var res = DatabaseService.updateTasksBatch(updatesArray);
+      var end = new Date().getTime();
+      Logger.log("updateTasksBatch executed " + updatesArray.length + " updates in " + (end - start) + "ms. Success: " + res.success);
+      return res;
+  }
+
+  // Legacy sequential fallback for Google Sheets
   // updatesArray = [{ id: '...', updates: { ... } }]
   var results = [];
   var errors = [];
@@ -407,7 +418,7 @@ function updateTasks(updatesArray) {
       errors.push('Task ' + u.id + ': ' + e.toString());
     }
   });
-  
+
   if (errors.length > 0) {
     return { success: false, error: errors.join('; '), count: results.length };
   }
@@ -965,22 +976,140 @@ function forceRebuildSchema() {
   const result = DatabaseService.initSchema();
   if (result.success) {
     Logger.log("SUCCESS! All tables built.");
-    try {
-        const allSettings = getSettings();
-        const conn = DatabaseService.getConnection();
-        const setStmt = conn.prepareStatement(`INSERT INTO settings (config_key, config_value) VALUES (?, ?)`);
-        Object.keys(allSettings).forEach(key => {
-          setStmt.setString(1, key);
-          setStmt.setString(2, allSettings[key]);
-          setStmt.addBatch();
-        });
-        if (Object.keys(allSettings).length > 0) setStmt.executeBatch();
-        setStmt.close();
-        Logger.log("Settings successfully populated from legacy Config/Sheets.");
-    } catch(e) {
-        Logger.log("Error migrating local settings: " + e.message);
-    }
+    syncSettingsFromSheets(); // Automatically populate config
   } else {
     Logger.log("FAILED to build schema: " + result.error);
   }
 }
+
+/**
+ * Syncs the Config properties (like AI Contexts) directly from Google Sheets
+ * deeply into the active SQL DB without overwriting active tasks.
+ */
+function syncSettingsFromSheets() {
+  Logger.log("Synchronizing settings from Google Sheets...");
+  try {
+      const id = getSpreadsheetId();
+      if (!id) return;
+      const sheet = SpreadsheetApp.openById(id).getSheetByName(SHEETS.SETTINGS);
+      if (!sheet) {
+          Logger.log("No Settings sheet found.");
+          return;
+      }
+      
+      const data = sheet.getDataRange().getValues();
+      const settings = {};
+      
+      for (let i = 1; i < data.length; i++) {
+        const key = data[i][0];
+        const value = data[i][1];
+        if (key) settings[key] = value;
+      }
+      
+      const conn = DatabaseService.getConnection();
+      // Use REPLACE INTO (MySQL) to gracefully overwrite missing/corrupted settings keys
+      const isPg = (PropertiesService.getScriptProperties().getProperty('DB_TYPE') || 'postgresql') === 'postgresql';
+      const insertQuery = isPg ? 
+         `INSERT INTO settings (config_key, config_value) VALUES (?, ?) ON CONFLICT (config_key) DO UPDATE SET config_value = EXCLUDED.config_value` :
+         `REPLACE INTO settings (config_key, config_value) VALUES (?, ?)`;
+         
+      const setStmt = conn.prepareStatement(insertQuery);
+      
+      let count = 0;
+      Object.keys(settings).forEach(key => {
+        setStmt.setString(1, key);
+        setStmt.setString(2, settings[key]);
+        setStmt.addBatch();
+        count++;
+      });
+      if (count > 0) setStmt.executeBatch();
+      setStmt.close();
+      Logger.log(`Successfully mapped ${count} AI routing/config settings to the DB!`);
+  } catch(e) {
+      Logger.log("Error migrating local settings: " + e.message);
+  }
+}
+
+/**
+ * Diagnostic tool to check AI Button processing
+ */
+function testAiCommand() {
+  Logger.log("Testing AI suggestAlignmentForInbox...");
+  try {
+    const tasks = DatabaseService.getAllItems().filter(t => t.status === 'inbox');
+    if (tasks.length === 0) {
+      Logger.log("No inbox tasks found in the SQL Database to test with! Create one first.");
+      return;
+    }
+    const targetId = tasks[0].id;
+    Logger.log("Routing Task ID: " + targetId + " | Title: " + tasks[0].title);
+    
+    const result = suggestAlignmentForInbox([targetId]);
+    Logger.log("AI Result: " + JSON.stringify(result, null, 2));
+  } catch(e) {
+    Logger.log("Fatal Exception: " + e.message + "\\n" + e.stack);
+  }
+}
+
+/**
+ * Diagnostic tool to wipe stale Model Caches and safely Auto-Discover the correct Paid API endpoint model
+ */
+function checkGeminiDebug() {
+    const props = PropertiesService.getScriptProperties();
+    const apiKey = props.getProperty('GEMINI_API_KEY');
+    if (!apiKey) {
+      Logger.log("ERROR: No GEMINI_API_KEY found in Script Properties!");
+      return;
+    }
+    
+    Logger.log("1. Wiping Stale Model Caches to force Google to re-evaluate available paid models...");
+    props.deleteProperty('GEMINI_MODEL');
+    props.deleteProperty('CACHED_GEMINI_MODEL');
+    
+    try {
+      Logger.log("2. Polling API Key for available provisioned models...");
+      const listResp = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + apiKey, {muteHttpExceptions: true});
+      const data = JSON.parse(listResp.getContentText());
+      if (!data.models) {
+          Logger.log("API List failed: " + listResp.getContentText());
+          return;
+      }
+      
+      let validModels = data.models.filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'));
+      Logger.log("Available GenerateContent Models found: " + validModels.length);
+      
+      // Look for latest flash proxy or stable pro
+      let targetModel = validModels.find(m => m.name.includes('gemini-1.5-flash-latest') || m.name.includes('gemini-2.0-flash')) || validModels[0];
+      Logger.log("Selected target model for test: " + targetModel.name);
+      
+      const url = "https://generativelanguage.googleapis.com/v1beta/" + targetModel.name + ":generateContent?key=" + apiKey;
+      const payload = { contents: [{ parts: [{ text: "Hello!" }] }] };
+      
+      Logger.log("3. Sending diagnostic PING to " + targetModel.name + "...");
+      const resp = UrlFetchApp.fetch(url, {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+      
+      const code = resp.getResponseCode();
+      Logger.log("HTTP Response Code: " + code);
+      
+      if (code === 429) {
+          Logger.log("CRITICAL 429 QUOTA ERROR DETECTED ON TARGET MODEL.");
+          Logger.log("Google Cloud has hard-locked this Paid Key to Zero Queries-Per-Minute. You must request a quota increase in GCP Console for Generative Language API.");
+      } else if (code === 404) {
+          Logger.log("CRITICAL 404 PATH ERROR. Model name resolution failed natively: " + resp.getContentText());
+      } else if (code === 200) {
+          Logger.log("SUCCESS! The API Call worked perfectly and returned: " + resp.getContentText().substring(0, 150) + "...");
+      } else {
+          Logger.log("UNKNOWN ERROR: " + resp.getContentText());
+      }
+    } catch(e) {
+      Logger.log("Execution Crash: " + e.message);
+    }
+}
+
+
+

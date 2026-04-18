@@ -3401,15 +3401,18 @@
             var tasks = getInboxTasks();
             if(!tasks.length) { showToast('Inbox is empty'); return; }
             
-            showToast('Asking AI to process Inbox...', 4000);
+            // Protect App Script execution bounds by routing no more than 10 complex tasks per bulk execution. 
+            // Ensures maximum LLM JSON output generation time stays strictly safely under the hard 60s script timeout.
+            var batch = tasks.slice(0, 10);
+            showToast('Asking AI to process ' + batch.length + ' Inbox items...', 4000);
             
-            var taskIds = tasks.map(x => x.id);
+            var taskIds = batch.map(x => x.id);
             
             google.script.run
                 .withSuccessHandler(function(res) {
                     if(!res || !res.success) { 
                         var err = res && res.error ? res.error : 'Unknown error (No serialized object return)';
-                        alert('AI Error: ' + err); 
+                        alert('API Trace: ' + err); 
                         return; 
                     }
                     

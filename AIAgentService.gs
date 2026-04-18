@@ -101,13 +101,28 @@ const AIAgentService = {
   suggestAlignmentForInbox: function(taskIds) {
     if (!taskIds || !taskIds.length) return { success: false, error: 'No tasks provided' };
     
-    const tasks = taskIds.map(id => TaskService.getTask(id)).filter(t => t);
-    if (!tasks.length) return { success: false, error: 'Tasks not found' };
+    // Exploit the high-speed JSON Unified Payload instead of firing N individual SQL JDBC ResultSet iterations
+    let payload;
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        payload = DatabaseService.getAllDataPayload();
+    } else {
+        payload = {
+            tasks: TaskService.getAllItems(),
+            projects: ProjectService.getActiveProjects(),
+            settings: getSettings()
+        };
+    }
     
-    const settings = getSettings();
+    const taskMap = {};
+    payload.tasks.forEach(t => taskMap[t.id] = t);
+    
+    const tasks = taskIds.map(id => taskMap[id]).filter(t => t);
+    if (!tasks.length) return { success: false, error: 'Tasks not found in payload' };
+    
+    const settings = payload.settings || {};
     const globalContext = settings['GLOBAL_AI_CONTEXT'] || '';
     
-    const projects = ProjectService.getActiveProjects();
+    const projects = payload.projects.filter(p => p.status === 'active');
     const projectSnippets = projects.map(p => {
       let snippet = `ID: ${p.id} | Name: ${p.name}`;
       if (p.aiContext) snippet += ` | Context: ${p.aiContext.substring(0, 100)}...`;
@@ -442,7 +457,10 @@ const AIAgentService = {
       const responseText = response.getContentText();
       
       if (responseCode !== 200) {
-        return { success: false, error: 'API Error (' + responseCode + '): ' + responseText };
+        if (responseCode === 429 || responseCode === 404) {
+            PropertiesService.getScriptProperties().deleteProperty('GEMINI_MODEL');
+        }
+        return { success: false, error: 'API Error (' + responseCode + ') on model [' + modelName + ']: ' + responseText };
       }
       
       const data = JSON.parse(responseText);

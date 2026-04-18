@@ -169,9 +169,9 @@ const DatabaseService = {
       areaId: rs.getString(20) || "",
       importance: rs.getString(21) || "",
       urgency: rs.getString(22) || "",
-      reviewCadence: rs.getInt(23) || 1,
+      isStarred: rs.getBoolean(23),
       lastReviewed: rs.getString(24) || "",
-      isDeleted: rs.getBoolean(25),
+      reviewCadence: rs.getInt(25) || 1,
       aiContext: rs.getString(26) || "",
       projectId: rs.getString(17) || "" // Legacy mapping fallback
     };
@@ -322,6 +322,112 @@ const DatabaseService = {
     } catch (e) {
       Logger.log("updateTask SQL Error: " + e.message);
       return { success: false, error: e.message };
+    }
+  },
+
+  /**
+   * Ultra-fast Batch Updater to eliminate the 300ms proxy latency per task
+   */
+  updateTasksBatch: function(updatesArray) {
+    if (!updatesArray || updatesArray.length === 0) return { success: true, count: 0, error: '' };
+    
+    let validUpdates = [];
+    let errors = [];
+    
+    // 1. In-Memory Resolution utilizing a lightning fast isolated subset fetch
+    try {
+        const conn = this.getConnection();
+        const ids = updatesArray.map(u => u.id);
+        const placeholders = ids.map(() => '?').join(',');
+        const stmt = conn.prepareStatement(`SELECT * FROM tasks WHERE id IN (${placeholders})`);
+        
+        for (let i = 0; i < ids.length; i++) {
+            stmt.setString(i + 1, ids[i]);
+        }
+        
+        const rs = stmt.executeQuery();
+        const taskMap = {};
+        while (rs.next()) {
+            const t = this._mapResultSetToTask(rs);
+            taskMap[t.id] = t;
+        }
+        rs.close();
+        stmt.close();
+        
+        updatesArray.forEach(u => {
+            const task = taskMap[u.id];
+            if (!task) { errors.push(u.id + ': Task not found'); return; }
+            
+            const merged = Object.assign({}, task, u.updates);
+            merged.modifiedDate = new Date().toISOString();
+            if (merged.type === 'task') merged.priority = PriorityService.calculatePriority(merged);
+            
+            validUpdates.push({ id: u.id, merged: merged });
+        });
+    } catch(e) {
+        Logger.log("updateTasksBatch fetch SQL Error: " + e.message);
+        return { success: false, count: 0, error: e.message };
+    }
+    
+    if (validUpdates.length === 0) return { success: false, count: 0, error: errors.join(', ') };
+
+    // 2. Transmit Bulk Sequence via executing Batch Statements
+    try {
+      const conn = this.getConnection();
+      conn.setAutoCommit(false); // Enable strict Transaction wrapper
+      
+      const stmt = conn.prepareStatement(`
+        UPDATE tasks SET 
+          title=?, notes=?, status=?, contextId=?, waitingFor=?, dueDate=?, scheduledDate=?,
+          completedDate=?, modifiedDate=?, priority=?, energyRequired=?, timeEstimate=?,
+          parentTaskId=?, sortOrder=?, areaId=?, importance=?, urgency=?, isStarred=?,
+          lastReviewed=?, reviewCadence=?, aiContext=?
+        WHERE id=?
+      `);
+      
+      validUpdates.forEach(v => {
+          const merged = v.merged;
+          stmt.setString(1, merged.title || "");
+          stmt.setString(2, merged.notes || "");
+          stmt.setString(3, merged.status || "inbox");
+          stmt.setString(4, merged.contextId || "");
+          stmt.setString(5, merged.waitingFor || "");
+          stmt.setString(6, merged.dueDate || "");
+          stmt.setString(7, merged.scheduledDate || "");
+          stmt.setString(8, merged.completedDate || "");
+          stmt.setString(9, merged.modifiedDate || "");
+          stmt.setInt(10, merged.priority || 0);
+          stmt.setString(11, merged.energyRequired || "medium");
+          stmt.setString(12, merged.timeEstimate || "");
+          stmt.setString(13, merged.parentTaskId || "");
+          stmt.setInt(14, merged.sortOrder || 0);
+          stmt.setString(15, merged.areaId || "");
+          stmt.setString(16, merged.importance || "");
+          stmt.setString(17, merged.urgency || "");
+          // JDBC boolean safety fallback
+          if (typeof merged.isStarred === 'boolean') {
+              stmt.setBoolean(18, merged.isStarred);
+          } else {
+              stmt.setBoolean(18, merged.isStarred === 'true' || merged.isStarred === true);
+          }
+          stmt.setString(19, merged.lastReviewed || "");
+          stmt.setInt(20, merged.reviewCadence || 1);
+          stmt.setString(21, merged.aiContext || "");
+          stmt.setString(22, v.id);
+          stmt.addBatch();
+      });
+      
+      stmt.executeBatch();
+      conn.commit();
+      conn.setAutoCommit(true);
+      stmt.close();
+      
+      if (typeof clearDataCache === 'function') clearDataCache();
+      
+      return { success: errors.length === 0, count: validUpdates.length, error: errors.join(', ') };
+    } catch (e) {
+      Logger.log("updateTasksBatch SQL Error: " + e.message);
+      return { success: false, count: 0, error: e.message };
     }
   },
 
