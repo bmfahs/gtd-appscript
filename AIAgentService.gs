@@ -173,16 +173,33 @@ const AIAgentService = {
       return { success: false, error: 'No items provided' };
     }
     
-    const stalledProjects = (payload.stalledProjectIds || []).map(id => ProjectService.getProject(id)).filter(p => p);
-    const malformedTasks = (payload.malformedTaskIds || []).map(id => TaskService.getTask(id)).filter(t => t);
-    
     const settings = getSettings();
     const globalContext = settings['GLOBAL_AI_CONTEXT'] || '';
     
     const contexts = ContextService.getAllContexts();
     const contextSnippets = contexts.map(c => `ID: ${c.id} | Name: ${c.name}`).join('\\n');
     
-    const allItems = TaskService.getAllItems();
+    Logger.log("AIAgent: Fetching Unified DB Payload");
+    let dbPayload;
+    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+        dbPayload = DatabaseService.getAllDataPayload();
+    } else {
+        dbPayload = {
+            tasks: TaskService.getAllItems(),
+            projects: ProjectService.getActiveProjects(),
+            settings: settings
+        };
+    }
+    // Reconstruct a unified array to mimic getAllItems() for the lineage scanner
+    const allItems = [...dbPayload.tasks, ...dbPayload.projects];
+    
+    // O(1) Dictionary Lookup
+    const itemMap = {};
+    allItems.forEach(i => itemMap[i.id] = i);
+    
+    Logger.log("AIAgent: Resolving Items from Payload");
+    const stalledProjects = (payload.stalledProjectIds || []).map(id => itemMap[id]).filter(p => p);
+    const malformedTasks = (payload.malformedTaskIds || []).map(id => itemMap[id]).filter(t => t);
     
     const stalledProjectSnippets = stalledProjects.map(p => {
         const lineage = this.getContextLineage(p, allItems);
@@ -192,7 +209,7 @@ const AIAgentService = {
     const malformedTaskSnippets = malformedTasks.map(t => {
       let snippet = `ID: ${t.id} | Title: "${t.title}" | Notes: "${t.notes}"`;
       if (t.parentTaskId) {
-        const parent = ProjectService.getProject(t.parentTaskId); 
+        const parent = itemMap[t.parentTaskId]; 
         if (parent) {
            const lineage = this.getContextLineage(parent, allItems);
            if (lineage !== "(No parent context defined)") {

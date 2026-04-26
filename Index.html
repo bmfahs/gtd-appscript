@@ -1515,8 +1515,7 @@
                     h += '</select>';
                     h += '</div>';
 
-                    h += '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openItemDialog(null, \'task\', \'' + p.id + '\')">Add Action</button>';
-                    h += '</div>';
+                    h += '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openItemDialog(null, \\\'task\\\', \\\'' + p.id + '\\\')">Add Action</button>';
                     h += '</div>';
 
                     // AI Inline Suggestion for Stalled Projects
@@ -1863,7 +1862,7 @@
         // Helper to get parent name
         function getParentProjectName(id) {
             if (!id) return '';
-            var p = state.projects.find(function (x) { return x.id === id; });
+            var p = state.projects.find(function (x) { return String(x.id) === String(id); });
             return p ? p.name : '';
         }
 
@@ -2556,7 +2555,7 @@
 
         function markReviewed(id) {
             // Optimistic Update
-            var item = state.tasks.find(x => x.id === id) || state.projects.find(x => x.id === id); // search both just in case, though projects are in tasks
+            var item = state.tasks.find(x => String(x.id) === String(id)) || state.projects.find(x => String(x.id) === String(id)); // search both just in case, though projects are in tasks
             if (item) {
                 item.lastReviewed = new Date().toISOString().split('T')[0];
                 renderPage('review');
@@ -2843,9 +2842,9 @@
                 // Determine list to search based on type override or search both
                 // Ideally we know if it is a task or project.
                 // But simplified: check tasks then projects.
-                item = state.tasks.find(function (t) { return t.id === id; });
+                item = state.tasks.find(function (t) { return String(t.id) === String(id); });
                 if (!item) {
-                    item = state.projects.find(function (p) { return p.id === id; });
+                    item = state.projects.find(function (p) { return String(p.id) === String(id); });
                 }
 
                 if (!item) {
@@ -2871,7 +2870,7 @@
                 document.getElementById('itemStatus').value = item.status || 'next';
 
                 // Type Logic
-                var type = item.type || (state.projects.some(p => p.id === id) ? 'project' : 'task');
+                var type = item.type || (state.projects.some(p => String(p.id) === String(id)) ? 'project' : 'task');
                 document.getElementById('itemType').value = type;
 
                 // Parent
@@ -3115,9 +3114,16 @@
             }
             showToast('Asking AI to process Attention Queue...', 4000);
 
+            // Protect App Script execution bounds by routing no more than 10 complex diagnostic items per bulk execution.
+            var stalledIds = data.stalledProjects.map(p => p.id);
+            var malformedIds = data.malformedTasks.map(item => item.task.id);
+            
+            var stalledBatch = stalledIds.slice(0, 5);
+            var malformedBatch = malformedIds.slice(0, 10 - stalledBatch.length);
+
             var payload = {
-                stalledProjectIds: data.stalledProjects.map(p => p.id),
-                malformedTaskIds: data.malformedTasks.map(item => item.task.id)
+                stalledProjectIds: stalledBatch,
+                malformedTaskIds: malformedBatch
             };
 
             google.script.run
@@ -3443,7 +3449,7 @@
 
         function suggestInboxAlignment(id) {
             // Overloaded to process just a single task inline
-            var tasks = getInboxTasks().filter(x => x.id === id);
+            var tasks = getInboxTasks().filter(x => String(x.id) === String(id));
             if (!tasks.length) return;
 
             showToast('Asking AI...');
@@ -3824,14 +3830,14 @@
             // Frontend: Tasks have parentTaskId. Projects have parentProjectId.
 
             var activeTaskChildren = state.tasks.filter(t =>
-                t.parentTaskId === id &&
+                String(t.parentTaskId) === String(id) &&
                 t.status !== 'done' &&
                 t.status !== 'deleted' &&
                 t.status !== 'dropped'
             );
 
             var activeProjectChildren = state.projects.filter(p =>
-                p.parentProjectId === id &&
+                String(p.parentProjectId) === String(id) &&
                 p.status !== 'completed' &&
                 p.status !== 'dropped'
             );
@@ -3989,7 +3995,7 @@
 
             items.forEach(function (el) {
                 var id = el.dataset.id;
-                var original = state.tasks.find(function (t) { return t.id === id; });
+                var original = state.tasks.find(function (t) { return String(t.id) === String(id); });
                 if (!original) return;
 
                 var u = {};
@@ -4103,9 +4109,9 @@
                 // Find original in State (Tasks or Projects?)
                 // Inbox items are technically tasks or projects, but usually tasks in 'inbox' status.
                 // state.tasks should have it.
-                var original = state.tasks.find(function (t) { return t.id === id; });
+                var original = state.tasks.find(function (t) { return String(t.id) === String(id); });
                 // Fallback to projects if not found (e.g. if we rendered a project in inbox?)
-                if (!original) original = state.projects.find(function (p) { return p.id === id; });
+                if (!original) original = state.projects.find(function (p) { return String(p.id) === String(id); });
 
                 if (!original) return;
 
@@ -4240,7 +4246,7 @@
 
             items.forEach(function (el) {
                 var id = el.dataset.id;
-                var original = state.projects.find(function (p) { return p.id === id; });
+                var original = state.projects.find(function (p) { return String(p.id) === String(id); });
                 if (!original) return;
 
                 var statusSelect = el.querySelector('.fix-status');
@@ -4314,7 +4320,7 @@
             }
 
             // Optimistic update
-            var t = state.tasks.find(function (x) { return x.id === id; });
+            var t = state.tasks.find(function (x) { return String(x.id) === String(id); });
             if (t) {
                 t.status = 'done';
                 // Remove from view immediately
@@ -4339,7 +4345,7 @@
             }
 
             // Optimistic update
-            var p = state.projects.find(function (x) { return x.id === id; });
+            var p = state.projects.find(function (x) { return String(x.id) === String(id); });
             if (p) {
                 p.status = 'completed';
                 // Remove from view immediately
@@ -4650,11 +4656,11 @@
                         if ((req.type === 'deleteTask' || req.type === 'deleteProject')) {
                             const idToDelete = req.data.id;
                             let collection = (req.type === 'deleteProject') ? state.projects : state.tasks;
-                            const localIdx = collection.findIndex(t => t.id === idToDelete);
+                            const localIdx = collection.findIndex(t => String(t.id) === String(idToDelete));
                             if (localIdx !== -1) {
                                 console.log('Removing deleted item from local state:', idToDelete);
                                 collection.splice(localIdx, 1);
-                                if (state.currentItem && state.currentItem.id === idToDelete) {
+                                if (state.currentItem && String(state.currentItem.id) === String(idToDelete)) {
                                     state.currentItem = null;
                                 }
                             }
