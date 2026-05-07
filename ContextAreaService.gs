@@ -9,6 +9,7 @@ const ContextService = {
    * Get all contexts
    */
   getAllContexts: function() {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) return FirestoreService.getAllContexts();
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) return DatabaseService.getAllContexts();
     
     const sheet = getSheet(SHEETS.CONTEXTS);
@@ -26,6 +27,7 @@ const ContextService = {
    * Get a single context by ID
    */
   getContext: function(contextId) {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) return FirestoreService.getTaskContext(contextId);
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) return DatabaseService.getTaskContext(contextId);
 
     const contexts = this.getAllContexts();
@@ -36,6 +38,9 @@ const ContextService = {
    * Create a new context
    */
   createContext: function(contextData) {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        return FirestoreService.createContext(contextData);
+    }
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         if (typeof clearDataCache === 'function') clearDataCache();
         return DatabaseService.createContext(contextData);
@@ -61,6 +66,9 @@ const ContextService = {
    * Update a context
    */
   updateContext: function(contextId, updates) {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        return FirestoreService.updateContext(contextId, updates);
+    }
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         if (typeof clearDataCache === 'function') clearDataCache();
         return DatabaseService.updateContext(contextId, updates);
@@ -89,6 +97,9 @@ const ContextService = {
    * Delete a context
    */
   deleteContext: function(contextId) {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        return FirestoreService.deleteContext(contextId);
+    }
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         if (typeof clearDataCache === 'function') clearDataCache();
         return DatabaseService.deleteContext(contextId);
@@ -139,6 +150,7 @@ const AreaService = {
    * Get all areas
    */
   getAllAreas: function() {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) return FirestoreService.getAllAreas();
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) return DatabaseService.getAllAreas();
 
     const sheet = getSheet(SHEETS.AREAS);
@@ -156,6 +168,7 @@ const AreaService = {
    * Get a single area by ID
    */
   getArea: function(areaId) {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) return FirestoreService.getArea(areaId);
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) return DatabaseService.getArea(areaId);
 
     const areas = this.getAllAreas();
@@ -166,6 +179,9 @@ const AreaService = {
    * Create a new area
    */
   createArea: function(areaData) {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        return FirestoreService.createArea(areaData);
+    }
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         if (typeof clearDataCache === 'function') clearDataCache();
         return DatabaseService.createArea(areaData);
@@ -192,6 +208,9 @@ const AreaService = {
    * Update an area
    */
   updateArea: function(areaId, updates) {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        return FirestoreService.updateArea(areaId, updates);
+    }
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         if (typeof clearDataCache === 'function') clearDataCache();
         return DatabaseService.updateArea(areaId, updates);
@@ -220,6 +239,9 @@ const AreaService = {
    * Delete an area
    */
   deleteArea: function(areaId) {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        return FirestoreService.deleteArea(areaId);
+    }
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         if (typeof clearDataCache === 'function') clearDataCache();
         return DatabaseService.deleteArea(areaId);

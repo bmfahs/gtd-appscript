@@ -200,8 +200,15 @@ function getAllData(forceRefresh) {
         }
     }
 
-    // Optimization: If SQL Backend is active, grab everything in ONE single database connection
-    // to avoid the 3-5 second handshake penalty per individual service query.
+    // Optimization: If FIRESTORE Backend is active
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        const payload = FirestoreService.getAllDataPayload();
+        const sanitizedFirestore = JSON.parse(JSON.stringify(payload));
+        try { cache.put('gtd_all_data', JSON.stringify(sanitizedFirestore), 21600); } catch(e){}
+        return sanitizedFirestore;
+    }
+
+    // Optimization: If SQL Backend is active
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         const payload = DatabaseService.getAllDataPayload();
         const sanitizedSql = JSON.parse(JSON.stringify(payload));
@@ -260,6 +267,10 @@ function getAllData(forceRefresh) {
     
     // If sheets don't exist, initialize first
     try {
+      if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+         Logger.log('Firestore Backend active. Ignoring fallback initialization.');
+         throw new Error("Critical fallback skipped because Firestore is active.");
+      }
       if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
          Logger.log('SQL Backend active. Ignoring fallback initialization.');
          throw new Error("Critical fallback skipped because SQL is active. Database schema must be migrated manually.");
@@ -287,6 +298,7 @@ function getAllData(forceRefresh) {
  * Get settings
  */
 function getSettings() {
+  if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) return FirestoreService.getSettings();
   if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) return DatabaseService.getSettings();
 
   const sheet = getSheet(SHEETS.SETTINGS);
@@ -307,6 +319,11 @@ function getSettings() {
  * Update a setting
  */
 function updateSetting(key, value) {
+  if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+      if (typeof clearDataCache === 'function') clearDataCache();
+      return FirestoreService.updateSetting(key, value);
+  }
+
   if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
       if (typeof clearDataCache === 'function') clearDataCache();
       return DatabaseService.updateSetting(key, value);
@@ -394,6 +411,13 @@ function updateTask(taskId, updates) {
 function updateTasks(updatesArray) {
   var start = new Date().getTime();
   
+  if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND && typeof FirestoreService.updateTasksBatch === 'function') {
+      var res = FirestoreService.updateTasksBatch(updatesArray);
+      var end = new Date().getTime();
+      Logger.log("updateTasksBatch executed " + updatesArray.length + " updates to Firestore in " + (end - start) + "ms. Success: " + res.success);
+      return res;
+  }
+
   // Ultra-Fast SQL Batch interceptor bypasses sequential 300ms proxy loops
   if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND && typeof DatabaseService.updateTasksBatch === 'function') {
       var res = DatabaseService.updateTasksBatch(updatesArray);
@@ -661,6 +685,10 @@ function exportCompletedItems() {
  * Compact the database by removing completed/deleted items
  */
 function compactDatabase() {
+  if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+    return { success: false, error: 'Database compaction is currently managed automatically by Firestore TTLs or is not implemented.' };
+  }
+  
   if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
     return DatabaseService.compactDatabase();
   }

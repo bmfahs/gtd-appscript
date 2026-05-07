@@ -12,6 +12,9 @@ const TaskService = {
    * Get all items (tasks and projects)
    */
   getAllItems: function() {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        return FirestoreService.getAllItems();
+    }
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         return DatabaseService.getAllItems();
     }
@@ -81,6 +84,9 @@ const TaskService = {
    * Get a single task by ID
    */
   getTask: function(taskId) {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        return FirestoreService.getTask(taskId);
+    }
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         return DatabaseService.getTask(taskId);
     }
@@ -137,6 +143,9 @@ const TaskService = {
         task.priority = PriorityService.calculatePriority(task);
     }
     
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        return FirestoreService.createTask(task).task;
+    }
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         return DatabaseService.createTask(task).task;
     }
@@ -166,6 +175,9 @@ const TaskService = {
         }
     }
     
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        return FirestoreService.updateTask(taskId, updates);
+    }
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         return DatabaseService.updateTask(taskId, updates);
     }
@@ -236,6 +248,9 @@ const TaskService = {
    * Check if item has active children
    */
   hasActiveChildren: function(parentId) {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        return FirestoreService.hasActiveChildren(parentId);
+    }
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         return DatabaseService.hasActiveChildren(parentId);
     }
@@ -263,6 +278,9 @@ const TaskService = {
    * Permanently delete a task
    */
   hardDeleteTask: function(taskId) {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        return FirestoreService.hardDeleteTask(taskId);
+    }
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         return DatabaseService.hardDeleteTask(taskId);
     }
@@ -413,6 +431,9 @@ const TaskService = {
    * Get next sort order value
    */
   getNextSortOrder: function() {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        return FirestoreService.getAllItems().reduce((max, t) => Math.max(max, t.sortOrder || 0), 0) + 1;
+    }
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         return DatabaseService.getMaxSortOrder() + 1;
     }

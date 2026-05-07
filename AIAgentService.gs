@@ -103,7 +103,9 @@ const AIAgentService = {
     
     // Exploit the high-speed JSON Unified Payload instead of firing N individual SQL JDBC ResultSet iterations
     let payload;
-    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        payload = FirestoreService.getAllDataPayload();
+    } else if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         payload = DatabaseService.getAllDataPayload();
     } else {
         payload = {
@@ -181,7 +183,9 @@ const AIAgentService = {
     
     Logger.log("AIAgent: Fetching Unified DB Payload");
     let dbPayload;
-    if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        dbPayload = FirestoreService.getAllDataPayload();
+    } else if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         dbPayload = DatabaseService.getAllDataPayload();
     } else {
         dbPayload = {

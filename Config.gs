@@ -5,6 +5,7 @@
 
 // Database Configuration
 const USE_SQL_BACKEND = true; // Set to true to bypass Sheets and natively route via Google Cloud SQL
+const USE_FIRESTORE_BACKEND = false; // Set to true to route traffic to Firestore instead of Cloud SQL
 
 // Spreadsheet ID management
 function getSpreadsheetId() {
@@ -91,7 +92,10 @@ const TASK_COLUMN_ORDER = (function() {
     // Note: This runs every time the script loads.
     // If we can't access the sheet (e.g. auth mode, error), fallback to Legacy (safest).
     
-    // HARD BYPASS FOR SQL: Do not load the spreadsheet API
+    // HARD BYPASS FOR SQL/FIRESTORE: Do not load the spreadsheet API
+    if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+        return newOrder;
+    }
     if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
         return newOrder;
     }
@@ -178,6 +182,9 @@ const GEMINI_MODEL = 'auto'; // 'auto' keys dynamic detection, or specify e.g. '
  * Get the spreadsheet instance
  */
 function getSpreadsheet() {
+  if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+    throw new Error('SUCCESS: Spreadsheet decoupled! Attempted to access Spreadsheet while FIRESTORE is enabled.');
+  }
   if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {
     throw new Error('SUCCESS: Spreadsheet decoupled! Application purposefully threw this error to prove it tried to access the slow Spreadsheet while SQL is enabled.');
   }
