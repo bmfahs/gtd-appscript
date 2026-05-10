@@ -206,34 +206,22 @@ const FirestoreService = {
 
   getAllDataPayload: function() {
     Logger.log("Fetching Payload from Firestore...");
-    // Fetch all sequentially or parallel. Parallel is faster.
-    const baseUrl = this.getBaseUrl();
-    const headers = this.getHeaders();
-    const reqs = [
-      { url: baseUrl + '/tasks?pageSize=1000', headers: headers, method: 'GET', muteHttpExceptions: true },
-      { url: baseUrl + '/contexts?pageSize=1000', headers: headers, method: 'GET', muteHttpExceptions: true },
-      { url: baseUrl + '/areas?pageSize=1000', headers: headers, method: 'GET', muteHttpExceptions: true },
-      { url: baseUrl + '/settings?pageSize=1000', headers: headers, method: 'GET', muteHttpExceptions: true }
-    ];
     
-    const responses = UrlFetchApp.fetchAll(reqs);
-    
-    const tasksRaw = JSON.parse(responses[0].getContentText()).documents || [];
-    const ctxRaw = JSON.parse(responses[1].getContentText()).documents || [];
-    const areasRaw = JSON.parse(responses[2].getContentText()).documents || [];
-    const setRaw = JSON.parse(responses[3].getContentText()).documents || [];
-    
-    const allItems = tasksRaw.map(d => this.documentToJs(d));
+    // fetchCollection automatically handles pagination
+    const allItems = this.fetchCollection('tasks');
+    const ctxRaw = this.fetchCollection('contexts');
+    const areasRaw = this.fetchCollection('areas');
+    const setRaw = this.fetchCollection('settings');
     
     const payload = {
       tasks: [],
       projects: [],
-      contexts: ctxRaw.map(d => this.documentToJs(d)).sort((a,b) => a.sortOrder - b.sortOrder),
-      areas: areasRaw.map(d => this.documentToJs(d)).sort((a,b) => a.sortOrder - b.sortOrder),
+      contexts: ctxRaw.sort((a,b) => a.sortOrder - b.sortOrder),
+      areas: areasRaw.sort((a,b) => a.sortOrder - b.sortOrder),
       settings: {}
     };
     
-    setRaw.map(d => this.documentToJs(d)).forEach(s => {
+    setRaw.forEach(s => {
       payload.settings[s.config_key] = s.config_value;
     });
 
@@ -246,9 +234,9 @@ const FirestoreService = {
        obj.reviewCadence = parseInt(obj.reviewCadence) || 1;
     });
 
-    payload.tasks = allItems.filter(t => (t.type === 'task' || !t.type) && t.status !== 'done' && t.status !== 'deleted');
+    payload.tasks = allItems.filter(t => (t.type === 'task' || !t.type) && t.status !== 'done' && t.status !== 'deleted' && t.isDeleted !== true && t.isDeleted !== 'true');
     
-    const activeProjectItems = allItems.filter(t => (t.type === 'project' || t.type === 'folder') && t.status !== 'done' && t.status !== 'deleted');
+    const activeProjectItems = allItems.filter(t => (t.type === 'project' || t.type === 'folder') && t.status !== 'done' && t.status !== 'deleted' && t.isDeleted !== true && t.isDeleted !== 'true');
     payload.projects = activeProjectItems.map(task => {
       let status = task.status;
       if (status === 'done') status = 'completed';
@@ -274,7 +262,7 @@ const FirestoreService = {
 
   hasActiveChildren: function(parentId) {
      const tasks = this.fetchCollection('tasks');
-     return tasks.some(t => t.parentTaskId === parentId && !['completed', 'done', 'dropped', 'deleted'].includes(t.status));
+     return tasks.some(t => t.parentTaskId === parentId && t.isDeleted !== true && t.isDeleted !== 'true' && !['completed', 'done', 'dropped', 'deleted', 'reference'].includes(t.status));
   },
 
   createTask: function(task) {
@@ -286,6 +274,9 @@ const FirestoreService = {
     
     const res = this.writeDocument('tasks', task.id, task, false);
     if (res.success && typeof clearDataCache === 'function') clearDataCache();
+    
+    // Explicitly return the task object for parity with DatabaseService
+    res.task = task;
     return res;
   },
 

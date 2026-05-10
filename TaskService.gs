@@ -171,7 +171,15 @@ const TaskService = {
         updates.status === 'dropped'
     )) {
         if (this.hasActiveChildren(taskId)) {
-            return { success: false, error: 'Cannot complete/delete item with active children' };
+            let activeNames = "Unknown";
+            try {
+                if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
+                    const tasks = FirestoreService.fetchCollection('tasks');
+                    const blockers = tasks.filter(t => t.parentTaskId === taskId && t.isDeleted !== true && t.isDeleted !== 'true' && !['completed', 'done', 'dropped', 'deleted', 'reference'].includes(t.status));
+                    activeNames = blockers.map(b => b.title + ' (Status: ' + b.status + ')').join(', ');
+                }
+            } catch(e) {}
+            return { success: false, error: 'Cannot complete/delete item with active children. Blockers: ' + activeNames };
         }
     }
     
@@ -255,11 +263,13 @@ const TaskService = {
         return DatabaseService.hasActiveChildren(parentId);
     }
     const children = this.getAllItems().filter(t => t.parentTaskId === parentId);
-    // Active children are those NOT done AND NOT deleted AND NOT dropped
     const activeChildren = children.filter(t => 
         t.status !== STATUS.DONE && 
         t.status !== STATUS.DELETED && 
-        t.status !== 'dropped'
+        t.status !== 'dropped' &&
+        t.status !== 'reference' &&
+        t.isDeleted !== true &&
+        t.isDeleted !== 'true'
     );
     return activeChildren.length > 0;
   },

@@ -225,7 +225,7 @@ const DatabaseService = {
     let conn;
     try {
       conn = this.getConnection();
-      const stmt = conn.prepareStatement("SELECT COUNT(*) FROM tasks WHERE parentTaskId = ? AND status != 'completed' AND status != 'done' AND status != 'dropped' AND status != 'deleted'");
+      const stmt = conn.prepareStatement("SELECT COUNT(*) FROM tasks WHERE parentTaskId = ? AND status != 'completed' AND status != 'done' AND status != 'dropped' AND status != 'deleted' AND status != 'reference' AND (isDeleted IS NULL OR isDeleted = 0 OR isDeleted = 'false')");
       stmt.setString(1, parentId);
       const rs = stmt.executeQuery();
       
