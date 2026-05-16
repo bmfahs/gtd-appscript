@@ -3291,9 +3291,15 @@
             if (!task) return;
 
             if (sugg.actionType === 'CONVERT_TO_PROJECT') {
-                task.type = 'project'; // Optimistic
+                var taskIndex = state.tasks.findIndex(t => t.id === taskId);
+                if (taskIndex > -1) {
+                    task.type = 'project';
+                    task.status = 'active';
+                    state.tasks.splice(taskIndex, 1);
+                    state.projects.push(task);
+                }
 
-                requestQueue.enqueue('updateTask', { id: taskId, updates: { type: 'project' } }, null, 'AI Convert to Project');
+                requestQueue.enqueue('updateTask', { id: taskId, updates: { type: 'project', status: 'active' } }, null, 'AI Convert to Project');
                 showToast('Task converted to Project!');
 
                 // Spawn context instantly for the new paradigm since it is fundamentally a routing operation!
@@ -3356,11 +3362,16 @@
 
         function forceConvertAttentionTaskAI(taskId) {
             var sugg = state.aiAttentionSuggestions.malformedTasks.find(s => s.taskId === taskId);
-            var task = state.tasks.find(t => t.id === taskId);
+            var taskIndex = state.tasks.findIndex(t => t.id === taskId);
+            var task = state.tasks[taskIndex];
             if (!task || !sugg) return;
 
             task.type = 'project';
             task.status = 'active';
+            if (taskIndex > -1) {
+                state.tasks.splice(taskIndex, 1);
+                state.projects.push(task);
+            }
             requestQueue.enqueue('updateTask', { id: taskId, updates: { type: 'project', status: 'active' } }, null, 'User Overrode: Convert to Project');
 
             google.script.run
@@ -3488,6 +3499,7 @@
 
             if (sugg.suggestedAction === 'EXISTING_PROJECT' && sugg.projectId) {
                 var updates = { type: 'task', parentTaskId: sugg.projectId, status: 'next' };
+                if (task) Object.assign(task, updates);
                 requestQueue.enqueue('updateTask', { id: taskId, updates: updates }, null, 'AI Align: ' + title);
 
                 if (state.aiSuggestions) delete state.aiSuggestions[taskId];
@@ -3514,6 +3526,7 @@
 
                 // 2. Route the task to the newly created project using tempId resolution
                 var updates = { type: 'task', parentTaskId: tempProjectId, status: 'next' };
+                if (task) Object.assign(task, updates);
                 requestQueue.enqueue('updateTask', { id: taskId, updates: updates }, null, 'AI Align: ' + title);
 
                 if (state.aiSuggestions) delete state.aiSuggestions[taskId];
