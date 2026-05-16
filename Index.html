@@ -1380,7 +1380,11 @@
             // 1. Stalled Projects: Active projects with no next actions
             // Filter: Must be active AND type='project' (Folders are ignored)
             var activeProjects = state.projects.filter(function (p) {
-                return p.status === 'active' && (!p.type || p.type === 'project');
+                return (!p.type || p.type === 'project') &&
+                       p.status !== 'completed' &&
+                       p.status !== 'dropped' &&
+                       p.status !== 'deleted' &&
+                       p.status !== 'someday';
             });
             activeProjects.forEach(function (p) {
                 // Check 1: Has incomplete sub-tasks?
@@ -1392,6 +1396,8 @@
                     return (t.projectId === p.id || t.parentTaskId === p.id) &&
                         t.status !== 'done' &&
                         t.status !== 'deleted' &&
+                        t.status !== 'dropped' &&
+                        t.status !== 'completed' &&
                         t.status !== 'reference';
                 });
 
