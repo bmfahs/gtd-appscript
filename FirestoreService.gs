@@ -370,6 +370,67 @@ const FirestoreService = {
      return res;
   },
   
+  compactDatabase: function() {
+     const allTasks = this.fetchCollection('tasks');
+     
+     const toDelete = [];
+     let tasksRemoved = 0;
+     let projectsRemoved = 0;
+
+     allTasks.forEach(t => {
+         let shouldDelete = false;
+         if (t.type === 'task' || !t.type) {
+             if (t.status === 'done' || t.status === 'deleted') shouldDelete = true;
+         } else if (t.type === 'project' || t.type === 'folder') {
+             if (t.status === 'completed' || t.status === 'dropped' || t.status === 'done' || t.status === 'deleted') shouldDelete = true;
+         }
+         
+         if (shouldDelete) {
+             toDelete.push(t.id);
+             if (t.type === 'task' || !t.type) tasksRemoved++;
+             else projectsRemoved++;
+         }
+     });
+
+     if (toDelete.length === 0) {
+         return { success: true, tasksRemoved: 0, projectsRemoved: 0 };
+     }
+
+     const baseUrl = this.getBaseUrl();
+     const headers = this.getHeaders();
+     const deleteReqs = toDelete.map(id => ({
+         url: baseUrl + '/tasks/' + id,
+         method: 'DELETE',
+         headers: headers,
+         muteHttpExceptions: true
+     }));
+
+     let errors = [];
+     
+     for (let i = 0; i < deleteReqs.length; i += 200) {
+         const batch = deleteReqs.slice(i, i + 200);
+         try {
+             const responses = UrlFetchApp.fetchAll(batch);
+             responses.forEach(res => {
+                 if (res.getResponseCode() !== 200 && res.getResponseCode() !== 404) {
+                     errors.push(res.getContentText());
+                 }
+             });
+         } catch (e) {
+             errors.push(e.message);
+         }
+     }
+
+     if (typeof clearDataCache === 'function') clearDataCache();
+
+     return {
+         success: errors.length === 0,
+         tasksRemoved: tasksRemoved,
+         projectsRemoved: projectsRemoved,
+         error: errors.join(', ')
+     };
+  },
+
   // ==========================================
   // SQL ROUTES FOR CONTEXTS, AREAS & SETTINGS
   // ==========================================

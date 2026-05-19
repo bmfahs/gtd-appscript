@@ -686,7 +686,7 @@ function exportCompletedItems() {
  */
 function compactDatabase() {
   if (typeof USE_FIRESTORE_BACKEND !== 'undefined' && USE_FIRESTORE_BACKEND) {
-    return { success: false, error: 'Database compaction is currently managed automatically by Firestore TTLs or is not implemented.' };
+    return FirestoreService.compactDatabase();
   }
   
   if (typeof USE_SQL_BACKEND !== 'undefined' && USE_SQL_BACKEND) {

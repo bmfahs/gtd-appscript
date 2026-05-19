@@ -2330,9 +2330,16 @@
                 // No, keep indentation logic but maybe adjust padding.
                 var commonStyle = 'margin-left: ' + padding + 'px; margin-bottom: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px;';
 
-                // Visual distinction for Someday status
-                if (node.data.status === 'someday') {
-                    commonStyle += ' opacity: 0.6; font-style: italic;';
+                var isScheduledFuture = false;
+                if (node.data.scheduledDate) {
+                    var todayDate = new Date().toISOString().split('T')[0];
+                    if (node.data.scheduledDate > todayDate) isScheduledFuture = true;
+                }
+
+                // Visual distinction for Someday status or Future Scheduled
+                if (node.data.status === 'someday' || isScheduledFuture) {
+                    commonStyle += ' opacity: 0.6;';
+                    if (node.data.status === 'someday') commonStyle += ' font-style: italic;';
                 }
 
                 // Toggle Icon
@@ -2351,7 +2358,8 @@
                     h += '<div class="project-card" onclick="openItemDialog(\'' + p.id + '\')" style="' + commonStyle + '">';
                     h += toggleHtml;
                     h += '<div class="task-checkbox" onclick="event.stopPropagation();completeProjectClick(\'' + p.id + '\')"></div>';
-                    h += '<div style="flex: 1; font-weight: 600; font-size: 14px; color: var(--text-primary); display: flex; align-items: center;"><span class="material-icons" style="font-size: 18px; margin-right: 6px; color: var(--text-muted);">' + icon + '</span>' + esc(p.name) + '</div>';
+                    var titlePrefix = isScheduledFuture ? '<span title="Scheduled for future" style="font-size:12px; margin-right:4px;">⏳</span>' : '';
+                    h += '<div style="flex: 1; font-weight: 600; font-size: 14px; color: var(--text-primary); display: flex; align-items: center;"><span class="material-icons" style="font-size: 18px; margin-right: 6px; color: var(--text-muted);">' + icon + '</span>' + titlePrefix + esc(p.name) + '</div>';
                     // Add Task Button (All Tasks View)
                     h += '<button class="btn-icon" onclick="event.stopPropagation(); openItemDialog(null, \'task\', \'' + p.id + '\')" title="Add Task to Project" style="color:var(--text-muted); padding:4px; margin-left:8px;"><span class="material-icons" style="font-size:18px;">add</span></button>';
                     h += '</div>';
@@ -2362,11 +2370,19 @@
                     var ctx = state.contexts.find(function (c) { return c.id === t.contextId; });
                     var prj = state.projects.find(function (p) { return p.id === t.projectId; });
 
-                    h += '<div class="task-item" style="margin-left: ' + padding + 'px; gap:8px;" onclick="openItemDialog(\'' + t.id + '\')">';
+                    var taskStyle = 'margin-left: ' + padding + 'px; gap:8px;';
+                    if (t.status === 'someday' || isScheduledFuture) {
+                        taskStyle += ' opacity: 0.6;';
+                        if (t.status === 'someday') taskStyle += ' font-style: italic;';
+                    }
+
+                    h += '<div class="task-item" style="' + taskStyle + '" onclick="openItemDialog(\'' + t.id + '\')">';
                     h += toggleHtml;
                     h += '<div class="task-checkbox" onclick="event.stopPropagation();completeTaskClick(\'' + t.id + '\')"></div>';
                     h += '<div class="task-content">';
-                    h += '<div class="task-title">' + esc(t.title);
+                    
+                    var taskTitlePrefix = isScheduledFuture ? '<span title="Scheduled for future" style="font-size:12px; margin-right:4px;">⏳</span>' : '';
+                    h += '<div class="task-title">' + taskTitlePrefix + esc(t.title);
                     if (t.emailThreadId) {
                         h += ' <a href="#" onclick="event.stopPropagation(); openGmail(\'' + t.emailThreadId + '\'); return false;" class="email-link-icon" title="Open in Gmail"><span class="material-icons" style="font-size: 16px; vertical-align: middle; color: var(--primary-color);">mail</span></a>';
                     }
@@ -3756,6 +3772,8 @@
                 showToast('Queued...');
 
                 if (type === 'task') {
+                    var t = state.tasks.find(x => x.id === id);
+                    if (t) Object.assign(t, d);
                     requestQueue.enqueue('updateTask', { id: id, updates: d }, null, 'Update: ' + d.title);
 
                     var oldParentId = state.currentItem.projectId || state.currentItem.parentTaskId || state.currentItem.parentProjectId || '';
@@ -3777,6 +3795,8 @@
                             .learnFromCorrection(id, oldParentId, d.parentTaskId);
                     }
                 } else {
+                    var p = state.projects.find(x => x.id === id);
+                    if (p) Object.assign(p, d);
                     requestQueue.enqueue('updateProject', { id: id, updates: d }, null, 'Update: ' + (d.name || d.title));
 
                     var oldParentId = state.currentItem.projectId || state.currentItem.parentTaskId || state.currentItem.parentProjectId || '';
@@ -3824,6 +3844,7 @@
             }
 
             closeItemDialog();
+            renderPage(state.currentPage);
         }
 
         function handleSaveSuccess(r) {

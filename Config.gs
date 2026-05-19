@@ -4,8 +4,8 @@
  */
 
 // Database Configuration
-const USE_SQL_BACKEND = true; // Set to true to bypass Sheets and natively route via Google Cloud SQL
-const USE_FIRESTORE_BACKEND = false; // Set to true to route traffic to Firestore instead of Cloud SQL
+const USE_SQL_BACKEND = false; // Set to true to bypass Sheets and natively route via Google Cloud SQL
+const USE_FIRESTORE_BACKEND = true; // Set to true to route traffic to Firestore instead of Cloud SQL
 
 // Spreadsheet ID management
 function getSpreadsheetId() {
