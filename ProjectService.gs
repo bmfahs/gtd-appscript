@@ -62,8 +62,8 @@ const ProjectService = {
       title: projectData.name,
       notes: projectData.description,
       status: projectData.status || 'active', // 'active' is valid for project type
-      // dueDate: projectData.dueDate,
       dueDate: projectData.dueDate,
+      scheduledDate: projectData.scheduledDate,
       type: projectData.type || TASK_TYPE.PROJECT,
       areaId: projectData.areaId,
       sortOrder: projectData.sortOrder,

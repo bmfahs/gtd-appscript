@@ -1694,7 +1694,7 @@
                 h += '<div class="empty-state"><span class="material-icons">search_off</span><h3>No matches found</h3></div>';
             } else {
                 h += '<div class="task-list">';
-                h += renderUnifiedTree(filteredRoots, 0);
+                h += renderUnifiedTree(filteredRoots, 0, false);
                 h += '</div>';
             }
             return h;
@@ -2217,7 +2217,7 @@
             var tree = buildUnifiedTree(state.tasks, state.projects, { includeInactiveProjects: true, includeInbox: false });
             var h = '<div class="page-header"><h2>All Tasks</h2><p>Unified Hierarchical View</p></div>';
             h += '<div class="task-list">';
-            h += renderUnifiedTree(tree, 0);
+            h += renderUnifiedTree(tree, 0, false);
             h += '</div>';
             return h;
         }
@@ -2317,7 +2317,7 @@
             renderPage(state.currentPage);
         }
 
-        function renderUnifiedTree(nodes, level) {
+        function renderUnifiedTree(nodes, level, parentIsFuture) {
             var h = '';
             nodes.forEach(function (node) {
                 var padding = level * 24;
@@ -2326,11 +2326,9 @@
                 var isCollapsed = state.collapsed[id];
 
                 // Combine styles into one string
-                // Reduced left margin since we adding a toggle/spacer which takes up space? 
-                // No, keep indentation logic but maybe adjust padding.
                 var commonStyle = 'margin-left: ' + padding + 'px; margin-bottom: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px;';
 
-                var isScheduledFuture = false;
+                var isScheduledFuture = parentIsFuture || false;
                 if (node.data.scheduledDate) {
                     var todayDate = new Date().toISOString().split('T')[0];
                     if (node.data.scheduledDate > todayDate) isScheduledFuture = true;
@@ -2397,7 +2395,7 @@
                 }
 
                 if (node.children.length > 0 && !isCollapsed) {
-                    h += renderUnifiedTree(node.children, level + 1);
+                    h += renderUnifiedTree(node.children, level + 1, isScheduledFuture);
                 }
             });
             return h;
@@ -3702,6 +3700,7 @@
                 status: document.getElementById('itemStatus').value,
                 type: type,
                 dueDate: document.getElementById('itemDueDate').value,
+                scheduledDate: document.getElementById('itemScheduledDate').value,
                 reviewCadence: document.getElementById('itemCadence').value,
                 aiContext: document.getElementById('itemAIContext').value
             };
@@ -3742,7 +3741,6 @@
                 // Star collection
                 var starBtn = document.getElementById('itemStarBtn');
                 d.isStarred = (starBtn.dataset.starred === "true");
-                d.scheduledDate = document.getElementById('itemScheduledDate').value;
 
                 // Parent Mapping
                 // FIX: Use parentTaskId directly for all hierarchy adjustments
@@ -3828,17 +3826,18 @@
                 // Create New (Full Dialog)
                 showToast('Queued...');
                 var tempId = 'temp-' + Date.now();
-                // We don't have a full local optimistic update for Dialog creation yet (unlike Quick Capture), 
-                // but we can add one if we want. For now, let's just queue it.
-                // Actually, if we want "Create then Edit" loop to work for Dialog creations too, we need a Temp ID.
-
-                // Let's attach the Temp ID to the data so backend *could* ignore it, or just use it for queue resolution.
+                
+                // Set optimistic ID
+                d.id = tempId;
 
                 if (type === 'task') {
-                    // Normalize data for validation if needed, or backend handles it.
-                    // Backend expects object.
+                    d.type = 'task';
+                    d.projectId = d.parentTaskId || ''; // Legacy compat
+                    state.tasks.push(d); // Optimistic insert
                     requestQueue.enqueue('createTask', d, tempId, 'Create: ' + d.title);
                 } else {
+                    d.type = 'project';
+                    state.projects.push(d); // Optimistic insert
                     requestQueue.enqueue('createProject', d, tempId, 'Create: ' + (d.name || d.title));
                 }
             }
